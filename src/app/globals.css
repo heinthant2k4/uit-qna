@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 245 245 245;
+  --fg: 23 23 23;
+  --surface: 255 255 255;
+  --surface-muted: 240 240 240;
+  --muted: 115 115 115;
+}
+
+.dark {
+  --bg: 8 8 8;
+  --fg: 245 245 245;
+  --surface: 23 23 23;
+  --surface-muted: 38 38 38;
+  --muted: 163 163 163;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-width: 360px;
+}
+
+body {
+  font-family: var(--font-sans), sans-serif;
+  color: rgb(var(--fg));
+  background: rgb(var(--bg));
+}
+
+@media (min-width: 768px) {
+  body {
+    background:
+      radial-gradient(circle at top, rgb(var(--surface-muted) / 0.45), transparent 58%),
+      rgb(var(--bg));
+  }
+}
+
+::selection {
+  background: rgb(20 184 166 / 0.22);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-sans), sans-serif;
+}
