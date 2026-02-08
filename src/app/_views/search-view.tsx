@@ -26,9 +26,7 @@ export function SearchView({ initialQuery, initialPage, initialCategory }: Props
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const voteMutation = useVoteMutation();
-  const result = useSearchQuestions(initialQuery, initialPage);
-  const filteredItems =
-    result.data?.items.filter((item) => (initialCategory === 'all' ? true : item.category === initialCategory)) ?? [];
+  const result = useSearchQuestions(initialQuery, initialPage, initialCategory);
 
   const submitSearch = () => {
     const nextQuery = query.trim();
@@ -94,23 +92,22 @@ export function SearchView({ initialQuery, initialPage, initialCategory }: Props
           <EmptyState title="Search failed" description={result.error instanceof Error ? result.error.message : 'Try again.'} />
         ) : null}
 
-        {result.data && filteredItems.length === 0 ? (
+        {result.data && result.data.items.length === 0 ? (
           <EmptyState title="No matches found" description="Try different keywords or ask a new question." />
         ) : null}
 
-        {result.data && filteredItems.length > 0 ? (
+        {result.data && result.data.items.length > 0 ? (
           <div className="space-y-3">
-            {filteredItems.map((question) => (
+            {result.data.items.map((question) => (
               <QuestionCard
                 key={question.id}
                 question={question}
-                href={`/q/${question.id}`}
+                href={`/q/${question.public_id}`}
                 voting={voteMutation.isPending && voteMutation.variables?.targetId === question.id}
                 onVote={() =>
                   voteMutation.mutate({
                     targetType: 'question',
                     targetId: question.id,
-                    value: 1,
                   })
                 }
               />

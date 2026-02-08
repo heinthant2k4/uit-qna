@@ -2,9 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
-
-import { getBrowserSupabaseClient } from '../../lib/supabase/browser';
+import { useState } from 'react';
 
 type Props = {
   children: ReactNode;
@@ -23,25 +21,6 @@ export function QueryProvider({ children }: Props) {
         },
       }),
   );
-
-  useEffect(() => {
-    const ensureSession = async () => {
-      try {
-        const supabase = getBrowserSupabaseClient();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          await supabase.auth.signInAnonymously();
-        }
-      } catch (error) {
-        console.error('Supabase browser client initialization failed.', error);
-      }
-    };
-
-    void ensureSession();
-  }, []);
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }

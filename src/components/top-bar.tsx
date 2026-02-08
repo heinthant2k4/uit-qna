@@ -24,7 +24,7 @@ export function TopBar({ title, subtitle, action, nav }: Props) {
         'sticky top-0 z-20 border-b border-neutral-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 dark:border-neutral-700 dark:bg-neutral-950/95 supports-[backdrop-filter]:dark:bg-neutral-950/85',
       )}
     >
-      <div className="mx-auto w-full max-w-[1040px] px-4 py-3 md:px-6">
+      <div className="mx-auto w-full max-w-[680px] px-4 py-3 md:px-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-medium leading-snug text-neutral-900 dark:text-neutral-100 md:text-base">

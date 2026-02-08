@@ -42,8 +42,8 @@ export default async function SearchPage({ searchParams }: Props) {
   if (query.length > 0) {
     const supabase = await createUserServerClient();
     await queryClient.prefetchQuery({
-      queryKey: qnaKeys.search(query, page, SEARCH_PAGE_SIZE),
-      queryFn: () => searchQuestions(supabase, { query, page, pageSize: SEARCH_PAGE_SIZE }),
+      queryKey: qnaKeys.search(query, page, category, SEARCH_PAGE_SIZE),
+      queryFn: () => searchQuestions(supabase, { query, page, category, pageSize: SEARCH_PAGE_SIZE }),
     });
   }
 

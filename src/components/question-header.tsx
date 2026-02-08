@@ -33,7 +33,7 @@ export function QuestionHeader({ question, voting, onVote, reportAction }: Props
       <CardContent className="p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <AnonAvatar seed={question.author.color_seed} handle={question.author.anon_handle} size={28} />
+            <AnonAvatar seed={question.author.color_seed} size={28} />
             <p className="text-xs text-neutral-500 dark:text-neutral-400">{question.author.anon_handle}</p>
           </div>
           <p className="text-xs text-neutral-400 dark:text-neutral-500">{dateLabel(question.created_at)}</p>

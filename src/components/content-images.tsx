@@ -17,15 +17,16 @@ export function ContentImages({ urls, compact }: Props) {
               src={url}
               alt="Attached content"
               loading="lazy"
-              className={`w-full rounded-xl border border-slate-200 object-cover ${compact ? 'h-36' : 'h-40'}`}
+              width={compact ? 720 : 1280}
+              height={compact ? 400 : 720}
+              className={`w-full rounded-xl border border-neutral-200 object-cover dark:border-neutral-700 ${compact ? 'h-36' : 'h-40'}`}
             />
           </a>
         ))}
       </div>
       {compact && urls.length > 1 ? (
-        <p className="mt-1 text-xs text-slate-500">+{urls.length - 1} more image(s)</p>
+        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">+{urls.length - 1} more image(s)</p>
       ) : null}
     </div>
   );
 }
-

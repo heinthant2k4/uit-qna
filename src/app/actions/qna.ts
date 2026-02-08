@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 
 import { normalizeImagePaths } from '../../lib/qna/images';
+import { QNA_IMAGE_BUCKET } from '../../lib/qna/images';
 import { createServiceRoleClient, createUserServerClient } from '../../lib/supabase/server';
 
 type QuestionCategory = 'academic' | 'facilities' | 'policy';
@@ -43,7 +44,6 @@ interface CreateAnswerInput {
 interface VoteInput {
   targetType: TargetType;
   targetId: string;
-  value?: 1 | -1;
 }
 
 interface ReportInput {
@@ -52,15 +52,7 @@ interface ReportInput {
   reason: string;
 }
 
-interface SimilarQuestion {
-  id: string;
-  title: string;
-  answer_count: number;
-}
-
 interface RecoveryCodeClaim {
-  restored_from_user_id: string;
-  restored_to_user_id: string;
   restored_at: string;
 }
 
@@ -88,49 +80,10 @@ const RATE_LIMITS: Record<TrustTier, Record<RateLimitedAction, RateLimitRule>> =
   },
 };
 
-const HANDLE_ADJECTIVES = [
-  'Quiet',
-  'Calm',
-  'Curious',
-  'Gentle',
-  'Bright',
-  'Wise',
-  'Clear',
-  'Soft',
-  'Steady',
-  'Kind',
-] as const;
-
-const HANDLE_ANIMALS = [
-  'Panda',
-  'Tiger',
-  'Fox',
-  'Otter',
-  'Raven',
-  'Falcon',
-  'Whale',
-  'Lynx',
-  'Heron',
-  'Koala',
-] as const;
-
 function toTier(trustScore: number): TrustTier {
   if (trustScore >= 5) return 'tier3';
   if (trustScore >= 2) return 'tier2';
   return 'tier1';
-}
-
-function buildAnonHandle(): string {
-  const adjective = HANDLE_ADJECTIVES[crypto.randomInt(HANDLE_ADJECTIVES.length)];
-  const animal = HANDLE_ANIMALS[crypto.randomInt(HANDLE_ANIMALS.length)];
-  const a = String.fromCharCode(65 + crypto.randomInt(26));
-  const b = String.fromCharCode(65 + crypto.randomInt(26));
-  return `${adjective}${animal}${a}${b}`;
-}
-
-function colorSeedFromId(userId: string): number {
-  const digest = crypto.createHash('md5').update(userId).digest('hex').slice(0, 8);
-  return Number.parseInt(digest, 16) % 361;
 }
 
 function normalizeTags(tags?: string[]): string[] {
@@ -141,7 +94,7 @@ function normalizeTags(tags?: string[]): string[] {
     const tag = rawTag.trim().toLowerCase().replace(/\s+/g, '-');
     if (tag.length < 2 || tag.length > 24) continue;
     unique.add(tag);
-    if (unique.size >= 12) break;
+    if (unique.size >= 3) break;
   }
   return [...unique];
 }
@@ -150,14 +103,6 @@ function generateRecoveryCode(): string {
   const raw = crypto.randomBytes(10).toString('hex').toUpperCase();
   const groups = raw.match(/.{1,5}/g);
   return groups ? groups.join('-') : raw;
-}
-
-function normalizeRecoveryCodeInput(code: string): string {
-  return code.toUpperCase().replace(/[^A-Z0-9]/g, '');
-}
-
-function hashRecoveryCode(code: string): string {
-  return crypto.createHash('sha256').update(normalizeRecoveryCodeInput(code)).digest('hex');
 }
 
 function isUuid(value: string): boolean {
@@ -188,25 +133,29 @@ async function ensureUserRow(adminClient: ReturnType<typeof createServiceRoleCli
   if (existingError) {
     throw new Error(`PROFILE_INIT_FAILED:${existingError.message}`);
   }
-  if (existing) return;
-
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const { error } = await adminClient.from('users').insert({
-      id: userId,
-      anon_handle: buildAnonHandle(),
-      color_seed: colorSeedFromId(userId),
-    });
-
-    if (!error) return;
-    if (error.code === '23505') {
-      const { data: raced } = await adminClient.from('users').select('id').eq('id', userId).maybeSingle();
-      if (raced) return;
-      continue;
-    }
-    throw new Error(`PROFILE_INIT_FAILED:${error.message}`);
+  if (!existing) {
+    throw new Error('PROFILE_NOT_READY');
   }
+}
 
-  throw new Error('PROFILE_INIT_FAILED:Could not generate a unique anonymous handle.');
+async function drainMediaDeletionQueue(adminClient: ReturnType<typeof createServiceRoleClient>) {
+  const { data: pending, error: pendingError } = await adminClient
+    .from('media_deletion_queue')
+    .select('id,path')
+    .is('processed_at', null)
+    .order('id', { ascending: true })
+    .limit(200);
+
+  if (pendingError || !pending?.length) return;
+
+  const paths = pending.map((item) => item.path);
+  await adminClient.storage.from(QNA_IMAGE_BUCKET).remove(paths);
+
+  const ids = pending.map((item) => item.id);
+  await adminClient
+    .from('media_deletion_queue')
+    .update({ processed_at: new Date().toISOString() })
+    .in('id', ids);
 }
 
 async function getTrustScore(adminClient: ReturnType<typeof createServiceRoleClient>, userId: string) {
@@ -326,6 +275,13 @@ function toActionError<T>(error: unknown, fallbackCode = 'INTERNAL_ERROR'): Acti
     if (error.message.startsWith('PROFILE_INIT_FAILED:')) {
       return { ok: false, error: 'Failed to initialize user profile.', code: 'PROFILE_INIT_FAILED' };
     }
+    if (error.message === 'PROFILE_NOT_READY') {
+      return {
+        ok: false,
+        error: 'Anonymous profile is still initializing. Reload and retry.',
+        code: 'PROFILE_NOT_READY',
+      };
+    }
     if (error.message.startsWith('TRUST_LOOKUP_FAILED:')) {
       return { ok: false, error: 'Failed to resolve trust tier.', code: 'TRUST_LOOKUP_FAILED' };
     }
@@ -383,40 +339,25 @@ export async function createRecoveryCode(): Promise<
 > {
   try {
     const adminClient = createServiceRoleClient();
-    const { userId } = await getAuthenticatedUserId();
+    const { userClient, userId } = await getAuthenticatedUserId();
     await ensureUserRow(adminClient, userId);
 
     const code = generateRecoveryCode();
-    const { data, error } = await adminClient.rpc('set_recovery_code', {
-      p_user_id: userId,
+    const { data, error } = await userClient.rpc('set_recovery_code', {
       p_code: code,
     });
 
-    if (!error) {
-      return {
-        ok: true,
-        data: {
-          code,
-          createdAt: String(data ?? new Date().toISOString()),
-        },
-      };
+    if (error) {
+      throw new Error(`RECOVERY_SET_FAILED:${error.message}`);
     }
 
-    const nowIso = new Date().toISOString();
-    const { error: directUpdateError } = await adminClient
-      .from('users')
-      .update({
-        recovery_code_hash: hashRecoveryCode(code),
-        recovery_code_created_at: nowIso,
-        recovery_code_used_at: null,
-      })
-      .eq('id', userId);
-
-    if (directUpdateError) {
-      throw new Error(`RECOVERY_SET_FAILED:${error.message}; ${directUpdateError.message}`);
-    }
-
-    return { ok: true, data: { code, createdAt: nowIso } };
+    return {
+      ok: true,
+      data: {
+        code,
+        createdAt: String(data ?? new Date().toISOString()),
+      },
+    };
   } catch (error) {
     return toActionError(error, 'RECOVERY_SET_FAILED');
   }
@@ -424,7 +365,7 @@ export async function createRecoveryCode(): Promise<
 
 export async function recoverAccountWithCode(
   recoveryCode: string,
-): Promise<ActionResult<{ restoredAt: string; restoredFromUserId: string }>> {
+): Promise<ActionResult<{ restoredAt: string }>> {
   try {
     const code = recoveryCode.trim();
     if (!code) {
@@ -432,11 +373,10 @@ export async function recoverAccountWithCode(
     }
 
     const adminClient = createServiceRoleClient();
-    const { userId } = await getAuthenticatedUserId();
+    const { userClient, userId } = await getAuthenticatedUserId();
     await ensureUserRow(adminClient, userId);
 
-    const { data, error } = await adminClient.rpc('claim_recovery_code', {
-      p_current_user_id: userId,
+    const { data, error } = await userClient.rpc('claim_recovery_code', {
       p_code: code,
     });
 
@@ -449,7 +389,6 @@ export async function recoverAccountWithCode(
       ok: true,
       data: {
         restoredAt: payload.restored_at ?? new Date().toISOString(),
-        restoredFromUserId: payload.restored_from_user_id ?? 'unknown',
       },
     };
   } catch (error) {
@@ -504,7 +443,7 @@ export async function rateLimitCheck(action: RateLimitedAction | string): Promis
 
 export async function createQuestion(
   input: CreateQuestionInput,
-): Promise<ActionResult<{ id: string; createdAt: string }>> {
+): Promise<ActionResult<{ id: string; publicId: string; createdAt: string }>> {
   try {
     const title = input.title?.trim();
     const body = input.body?.trim();
@@ -513,6 +452,9 @@ export async function createQuestion(
 
     if (title === undefined || body === undefined) {
       throw new Error('INVALID_INPUT:Title and body are required.');
+    }
+    if (!title || !body) {
+      throw new Error('INVALID_INPUT:Title and body cannot be empty.');
     }
     if (!validateCategory(input.category)) {
       throw new Error('INVALID_INPUT:Invalid question category.');
@@ -533,14 +475,21 @@ export async function createQuestion(
         image_paths: imagePaths,
         category: input.category,
       })
-      .select('id, created_at')
+      .select('id, public_id, created_at')
       .single();
 
     if (error) {
       return { ok: false, error: error.message, code: error.code ?? 'QUESTION_CREATE_FAILED' };
     }
 
-    return { ok: true, data: { id: data.id, createdAt: data.created_at } };
+    return {
+      ok: true,
+      data: {
+        id: data.id,
+        publicId: data.public_id,
+        createdAt: data.created_at,
+      },
+    };
   } catch (error) {
     return toActionError(error, 'QUESTION_CREATE_FAILED');
   }
@@ -559,6 +508,9 @@ export async function createAnswer(
     }
     if (body === undefined) {
       throw new Error('INVALID_INPUT:Body is required.');
+    }
+    if (!body) {
+      throw new Error('INVALID_INPUT:Answer body cannot be empty.');
     }
 
     const adminClient = createServiceRoleClient();
@@ -610,16 +562,12 @@ export async function createAnswer(
 export async function vote(input: VoteInput): Promise<ActionResult<{ applied: boolean }>> {
   try {
     const targetId = input.targetId?.trim();
-    const value = input.value ?? 1;
 
     if (!validateTargetType(input.targetType)) {
       throw new Error('INVALID_INPUT:Invalid target type.');
     }
     if (!targetId || !isUuid(targetId)) {
       throw new Error('INVALID_INPUT:Invalid target ID.');
-    }
-    if (value !== 1 && value !== -1) {
-      throw new Error('INVALID_INPUT:Vote value must be 1 or -1.');
     }
 
     const adminClient = createServiceRoleClient();
@@ -631,7 +579,7 @@ export async function vote(input: VoteInput): Promise<ActionResult<{ applied: bo
       user_id: userId,
       target_type: input.targetType,
       target_id: targetId,
-      value,
+      value: 1,
     });
 
     if (error) {
@@ -685,51 +633,22 @@ export async function report(input: ReportInput): Promise<ActionResult<{ submitt
       };
     }
 
-    const { data: hiddenData } = await adminClient.rpc('evaluate_reports_and_maybe_hide', {
-      p_target_type: input.targetType,
-      p_target_id: targetId,
-    });
+    const { data: targetRow } = await adminClient
+      .from(input.targetType === 'question' ? 'questions' : 'answers')
+      .select('status')
+      .eq('id', targetId)
+      .maybeSingle();
 
-    return { ok: true, data: { submitted: true, hidden: Boolean(hiddenData) } };
-  } catch (error) {
-    return toActionError(error, 'REPORT_FAILED');
-  }
-}
-
-export async function findSimilarQuestions(
-  title: string,
-  limit = 5,
-): Promise<ActionResult<SimilarQuestion[]>> {
-  try {
-    const normalized = title.trim();
-    if (normalized.length < 8) {
-      return { ok: true, data: [] };
-    }
-
-    const { userClient } = await getAuthenticatedUserId();
-    const safeLimit = Math.min(Math.max(limit, 1), 10);
-
-    const { data, error } = await userClient
-      .from('questions')
-      .select('id,title,answer_count')
-      .ilike('title', `%${normalized}%`)
-      .order('score', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(safeLimit);
-
-    if (error) {
-      return { ok: false, error: error.message, code: error.code ?? 'SIMILAR_QUERY_FAILED' };
-    }
+    await drainMediaDeletionQueue(adminClient);
 
     return {
       ok: true,
-      data: (data ?? []).map((item) => ({
-        id: item.id,
-        title: item.title,
-        answer_count: item.answer_count,
-      })),
+      data: {
+        submitted: true,
+        hidden: targetRow?.status === 'hidden',
+      },
     };
   } catch (error) {
-    return toActionError(error, 'SIMILAR_QUERY_FAILED');
+    return toActionError(error, 'REPORT_FAILED');
   }
 }

@@ -48,7 +48,7 @@ export function QuestionDetailView({ questionId }: Props) {
       ) : null}
 
       {questionQuery.data ? (
-        <div className="space-y-4 md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start md:gap-4 md:space-y-0">
+        <div className="space-y-4">
           <div className="space-y-4">
             <QuestionHeader
               question={questionQuery.data.question}
@@ -61,7 +61,6 @@ export function QuestionDetailView({ questionId }: Props) {
                 voteMutation.mutate({
                   targetType: 'question',
                   targetId: questionQuery.data.question.id,
-                  value: 1,
                 })
               }
               reportAction={
@@ -94,7 +93,7 @@ export function QuestionDetailView({ questionId }: Props) {
                     voteMutation.mutate({
                       targetType: 'answer',
                       targetId: questionQuery.data!.best_answer!.id,
-                      value: 1,
+                      questionId: questionQuery.data!.question.id,
                     })
                   }
                   reportAction={
@@ -149,7 +148,7 @@ export function QuestionDetailView({ questionId }: Props) {
                         voteMutation.mutate({
                           targetType: 'answer',
                           targetId: answer.id,
-                          value: 1,
+                          questionId: questionQuery.data!.question.id,
                         })
                       }
                       reportAction={
@@ -172,7 +171,7 @@ export function QuestionDetailView({ questionId }: Props) {
             </section>
           </div>
 
-          <div className="space-y-4 md:sticky md:top-24">
+          <div className="space-y-4">
             <Card>
               <CardHeader className="pb-0">
                 <CardTitle className="text-sm">Write Answer</CardTitle>

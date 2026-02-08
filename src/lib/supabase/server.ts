@@ -1,8 +1,10 @@
-import 'server-only';
-
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+
+if (typeof window !== 'undefined') {
+  throw new Error('src/lib/supabase/server.ts can only run on the server.');
+}
 
 function requiredEnv(name: string): string {
   const value = process.env[name];

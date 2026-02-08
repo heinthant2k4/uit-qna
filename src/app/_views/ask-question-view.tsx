@@ -54,7 +54,7 @@ export function AskQuestionView() {
 
   return (
     <AppShell nav="ask" title="Ask a Question" subtitle="Anonymous, precise, and helpful">
-      <div className="space-y-4 md:grid md:grid-cols-[minmax(0,1fr)_280px] md:items-start md:gap-4 md:space-y-0">
+      <div className="space-y-4">
         <div className="space-y-4">
           <Card className="md:hidden">
             <CardContent className="space-y-2 p-4 text-sm text-neutral-600 dark:text-neutral-300">
@@ -90,7 +90,7 @@ export function AskQuestionView() {
                   category,
                   imagePaths: uploadedPaths,
                 });
-                router.push(`/q/${result.id}`);
+                router.push(`/q/${result.publicId}`);
               } catch (error) {
                 if (uploadedPaths.length > 0) {
                   await deleteUploadedImages(uploadedPaths);
@@ -206,7 +206,7 @@ export function AskQuestionView() {
           </form>
         </div>
 
-        <aside className="space-y-4 md:sticky md:top-24">
+        <aside className="space-y-4">
           <Card>
             <CardHeader className="pb-0">
               <CardTitle className="text-sm">Similar Questions</CardTitle>
@@ -221,7 +221,7 @@ export function AskQuestionView() {
                   {similarQuestions.data.map((question) => (
                     <Link
                       key={question.id}
-                      href={`/q/${question.id}`}
+                      href={`/q/${question.public_id}`}
                       className="block rounded-xl border border-neutral-200 p-3 text-sm text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
                     >
                       <p className="font-medium text-neutral-900 dark:text-neutral-100">{question.title}</p>

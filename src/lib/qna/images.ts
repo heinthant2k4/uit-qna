@@ -31,19 +31,3 @@ export function normalizeImagePaths(paths?: string[]): string[] {
 
   return [...unique];
 }
-
-export function toPublicImageUrl(path: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!baseUrl) {
-    return '';
-  }
-
-  const encodedPath = path
-    .split('/')
-    .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
-    .join('/');
-
-  return `${baseUrl.replace(/\/$/, '')}/storage/v1/object/public/${QNA_IMAGE_BUCKET}/${encodedPath}`;
-}
-

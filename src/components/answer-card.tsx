@@ -25,7 +25,7 @@ export function AnswerCard({ answer, voting, onVote, reportAction }: Props) {
       <CardContent className="p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <AnonAvatar seed={answer.author.color_seed} handle={answer.author.anon_handle} />
+            <AnonAvatar seed={answer.author.color_seed} />
             <p className="text-xs text-neutral-500 dark:text-neutral-400">{answer.author.anon_handle}</p>
           </div>
           <div className="flex items-center gap-2">

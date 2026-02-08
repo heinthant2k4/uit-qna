@@ -22,7 +22,7 @@ export function RecoverAccountView() {
 
   return (
     <AppShell nav="home" title="Recovery Code" subtitle="Restore anonymous account access">
-      <div className="mx-auto w-full max-w-[820px] space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+      <div className="mx-auto w-full max-w-[680px] space-y-4">
         <Card className="h-full">
           <CardHeader className="pb-0">
             <CardTitle className="text-sm">Generate Recovery Code</CardTitle>

@@ -15,7 +15,7 @@ export function AppShell({ title, subtitle, nav, topAction, children }: Props) {
   return (
     <div className="min-h-screen bg-neutral-50 pb-24 dark:bg-neutral-950 md:pb-8">
       <TopBar title={title} subtitle={subtitle} action={topAction} nav={nav} />
-      <main className="mx-auto w-full max-w-[1040px] px-4 py-4 md:px-6 md:py-6">{children}</main>
+      <main className="mx-auto w-full max-w-[680px] px-4 py-4 md:px-4 md:py-4">{children}</main>
       <BottomNav active={nav} />
     </div>
   );

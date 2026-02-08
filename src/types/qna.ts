@@ -8,6 +8,7 @@ export interface UserSummary {
 
 export interface Question {
   id: string;
+  public_id: string;
   title: string;
   body: string;
   category: QuestionCategory;

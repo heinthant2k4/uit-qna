@@ -43,8 +43,8 @@ export default async function HomePage({ searchParams }: Props) {
   const supabase = await createUserServerClient();
 
   await queryClient.prefetchQuery({
-    queryKey: qnaKeys.feed(sort, page, FEED_PAGE_SIZE),
-    queryFn: () => fetchFeedQuestions(supabase, { sort, page, pageSize: FEED_PAGE_SIZE }),
+    queryKey: qnaKeys.feed(sort, page, category, FEED_PAGE_SIZE),
+    queryFn: () => fetchFeedQuestions(supabase, { sort, page, category, pageSize: FEED_PAGE_SIZE }),
   });
 
   return (

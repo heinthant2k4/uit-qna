@@ -9,7 +9,7 @@ import type { PaginatedResult, Question, QuestionDetail } from '../../types/qna'
 type VoteInput = {
   targetType: 'question' | 'answer';
   targetId: string;
-  value: 1 | -1;
+  questionId?: string;
 };
 
 type SnapshotContext = {
@@ -48,7 +48,7 @@ export function useVoteMutation() {
           return {
             ...old,
             items: old.items.map((item) =>
-              item.id === input.targetId ? { ...item, score: item.score + input.value } : item,
+              item.id === input.targetId ? { ...item, score: item.score + 1 } : item,
             ),
           };
         });
@@ -58,7 +58,7 @@ export function useVoteMutation() {
           return {
             ...old,
             items: old.items.map((item) =>
-              item.id === input.targetId ? { ...item, score: item.score + input.value } : item,
+              item.id === input.targetId ? { ...item, score: item.score + 1 } : item,
             ),
           };
         });
@@ -67,7 +67,7 @@ export function useVoteMutation() {
           if (!old) return old;
           return {
             ...old,
-            question: { ...old.question, score: old.question.score + input.value },
+            question: { ...old.question, score: old.question.score + 1 },
           };
         });
       } else {
@@ -76,11 +76,11 @@ export function useVoteMutation() {
 
           const bestAnswer =
             old.best_answer && old.best_answer.id === input.targetId
-              ? { ...old.best_answer, score: old.best_answer.score + input.value }
+              ? { ...old.best_answer, score: old.best_answer.score + 1 }
               : old.best_answer;
 
           const otherAnswers = old.other_answers.map((answer) =>
-            answer.id === input.targetId ? { ...answer, score: answer.score + input.value } : answer,
+            answer.id === input.targetId ? { ...answer, score: answer.score + 1 } : answer,
           );
 
           return {
@@ -106,12 +106,16 @@ export function useVoteMutation() {
       });
     },
     onSettled: (_data, _error, input) => {
-      void queryClient.invalidateQueries({ queryKey: qnaKeys.feedRoot });
-      void queryClient.invalidateQueries({ queryKey: qnaKeys.searchRoot });
       if (input?.targetType === 'question') {
+        void queryClient.invalidateQueries({ queryKey: qnaKeys.feedRoot });
+        void queryClient.invalidateQueries({ queryKey: qnaKeys.searchRoot });
         void queryClient.invalidateQueries({ queryKey: qnaKeys.detail(input.targetId) });
       } else {
-        void queryClient.invalidateQueries({ queryKey: qnaKeys.detailRoot });
+        if (input?.questionId) {
+          void queryClient.invalidateQueries({ queryKey: qnaKeys.detail(input.questionId) });
+        } else {
+          void queryClient.invalidateQueries({ queryKey: qnaKeys.detailRoot });
+        }
       }
     },
   });

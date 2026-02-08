@@ -36,19 +36,15 @@ export function QuestionCard({ question, href, voting, onVote }: Props) {
     <Card className="h-full">
       <CardContent className="p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            <span
-              className="mr-1 inline-block h-2 w-2 rounded-full align-middle"
-              style={{ backgroundColor: `hsl(${question.author.color_seed} 70% 45%)` }}
-            />
-            {question.author.anon_handle}
-          </p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Anonymous student</p>
           <p className="text-xs text-neutral-400 dark:text-neutral-500">{dateLabel(question.created_at)}</p>
         </div>
 
         <Link href={href} className="block focus:outline-none">
           <h2 className="text-lg font-medium leading-snug text-neutral-900 dark:text-neutral-100">{question.title}</h2>
-          <p className="mt-1 text-sm leading-relaxed text-neutral-700 dark:text-neutral-200">{excerpt(question.body)}</p>
+          {question.body ? (
+            <p className="mt-1 text-sm leading-relaxed text-neutral-700 dark:text-neutral-200">{excerpt(question.body)}</p>
+          ) : null}
         </Link>
 
         <ContentImages urls={question.image_urls} compact />
