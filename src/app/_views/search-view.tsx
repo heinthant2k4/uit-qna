@@ -6,13 +6,11 @@ import { useState } from 'react';
 
 import { AppShell } from '../../components/app-shell';
 import { EmptyState } from '../../components/empty-state';
+import { ChevronLeft, ChevronRight } from 'react-feather';
 import { LoadingList } from '../../components/loading-list';
 import { QuestionCard } from '../../components/question-card';
-import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
-import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { useVoteMutation } from '../../hooks/mutations/use-vote-mutation';
 import { useSearchQuestions } from '../../hooks/queries/use-search-questions';
 
@@ -22,11 +20,33 @@ type Props = {
   initialCategory: 'all' | 'academic' | 'facilities' | 'policy';
 };
 
+const CATEGORY_OPTIONS = [
+  { value: 'all' as const, label: 'All' },
+  { value: 'academic' as const, label: 'Academic' },
+  { value: 'facilities' as const, label: 'Facilities' },
+  { value: 'policy' as const, label: 'Policy' },
+];
+
+function buildPageNumbers(current: number, total: number): (number | '…')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | '…')[] = [1];
+  if (current > 3) pages.push('…');
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+    pages.push(i);
+  }
+  if (current < total - 2) pages.push('…');
+  pages.push(total);
+  return pages;
+}
+
 export function SearchView({ initialQuery, initialPage, initialCategory }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const voteMutation = useVoteMutation();
   const result = useSearchQuestions(initialQuery, initialPage, initialCategory);
+
+  const totalPages = result.data ? Math.max(1, Math.ceil(result.data.total / result.data.page_size)) : 1;
+  const pageNumbers = buildPageNumbers(initialPage, totalPages);
 
   const submitSearch = () => {
     const nextQuery = query.trim();
@@ -47,57 +67,73 @@ export function SearchView({ initialQuery, initialPage, initialCategory }: Props
   };
 
   return (
-    <AppShell nav="search" title="Search Questions" subtitle="Find existing knowledge before asking">
-      <div className="mx-auto w-full max-w-[720px] space-y-3 md:space-y-4">
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <form
-              className="flex gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                submitSearch();
-              }}
+    <AppShell nav="search" title="Search" subtitle="Find answers before you ask">
+      <div className="space-y-4">
+        {/* Search bar — no card wrapper */}
+        <form
+          className="flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitSearch();
+          }}
+        >
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            className="flex-1"
+            placeholder="Search titles and descriptions"
+            aria-label="Search questions"
+          />
+          <Button type="submit" variant="cta">Search</Button>
+        </form>
+
+        {/* Inline category filter pills */}
+        <div className="flex items-center gap-1 rounded-xl border border-[rgb(var(--line))] bg-[rgb(var(--surface-2))] p-1">
+          {CATEGORY_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleCategoryChange(option.value)}
+              className={`rounded-lg px-3 py-1.5 text-caption font-medium transition-all ${
+                initialCategory === option.value
+                  ? 'bg-[rgb(var(--surface))] text-[rgb(var(--fg))] shadow-sm'
+                  : 'text-[rgb(var(--muted))] hover:text-[rgb(var(--fg))]'
+              }`}
             >
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.currentTarget.value)}
-                className="flex-1"
-                placeholder="Search by title or body"
-              />
-              <Button type="submit">Search</Button>
-            </form>
+              {option.label}
+            </button>
+          ))}
+        </div>
 
-            <Tabs value={initialCategory} onValueChange={handleCategoryChange}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="academic">Academic</TabsTrigger>
-                <TabsTrigger value="facilities">Facility</TabsTrigger>
-                <TabsTrigger value="policy">Policy</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{result.data?.total ?? 0} results</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        {!initialQuery.trim() ? (
-          <EmptyState title="Search questions" description="Use keywords for academic, facilities, or policy questions." />
+        {/* Results heading */}
+        {initialQuery.trim() && result.data ? (
+          <h2 className="text-title-sm text-[rgb(var(--fg))]">
+            {result.data.total.toLocaleString()} result{result.data.total === 1 ? '' : 's'} for &quot;{initialQuery}&quot;
+          </h2>
         ) : null}
 
-        {result.isLoading && initialQuery.trim() ? <LoadingList /> : null}
+        {!initialQuery.trim() ? (
+          <EmptyState
+            title="Search questions"
+            description="Use keywords for academic, facilities, or policy topics. Try broader terms if you don't find a match."
+          />
+        ) : null}
+
+        {result.isLoading && initialQuery.trim() ? <LoadingList count={5} /> : null}
 
         {result.isError ? (
-          <EmptyState title="Search failed" description={result.error instanceof Error ? result.error.message : 'Try again.'} />
+          <EmptyState title="Search failed" description={result.error instanceof Error ? result.error.message : 'Please try again'} />
         ) : null}
 
         {result.data && result.data.items.length === 0 ? (
-          <EmptyState title="No matches found" description="Try different keywords or ask a new question." />
+          <EmptyState
+            title="No matches found"
+            description="Try different keywords, remove category filters, or ask a new question"
+          />
         ) : null}
 
         {result.data && result.data.items.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-3 stagger-list">
             {result.data.items.map((question) => (
               <QuestionCard
                 key={question.id}
@@ -110,33 +146,56 @@ export function SearchView({ initialQuery, initialPage, initialCategory }: Props
                     targetId: question.id,
                   })
                 }
+                showAnswerCta
               />
             ))}
           </div>
         ) : null}
 
-        {result.data && initialQuery.trim() ? (
-          <div className="grid grid-cols-2 gap-2 md:max-w-[420px]">
-            {result.data.page <= 1 ? (
-              <Button variant="outline" disabled>
-                Previous
+        {/* Numbered pagination */}
+        {result.data && initialQuery.trim() && totalPages > 1 ? (
+          <div className="flex items-center justify-center gap-1 pt-2">
+            {initialPage > 1 ? (
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/search?q=${encodeURIComponent(initialQuery)}&page=${initialPage - 1}&cat=${initialCategory}`}>
+                  <ChevronLeft size={18} />
+                </Link>
               </Button>
             ) : (
-              <Button asChild variant="outline">
-                <Link href={`/search?q=${encodeURIComponent(initialQuery)}&page=${result.data.page - 1}&cat=${initialCategory}`}>
-                  Previous
-                </Link>
+              <Button variant="ghost" size="sm" disabled>
+                <ChevronLeft size={18} />
               </Button>
             )}
+
+            {pageNumbers.map((p, i) =>
+              p === '…' ? (
+                <span key={`ellipsis-${i}`} className="px-1 text-caption text-[rgb(var(--muted))]">…</span>
+              ) : (
+                <Button
+                  key={p}
+                  asChild={p !== initialPage ? true : undefined}
+                  variant={p === initialPage ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="min-w-[36px]"
+                >
+                  {p !== initialPage ? (
+                    <Link href={`/search?q=${encodeURIComponent(initialQuery)}&page=${p}&cat=${initialCategory}`}>{p}</Link>
+                  ) : (
+                    <span>{p}</span>
+                  )}
+                </Button>
+              ),
+            )}
+
             {result.data.has_next ? (
-              <Button asChild>
-                <Link href={`/search?q=${encodeURIComponent(initialQuery)}&page=${result.data.page + 1}&cat=${initialCategory}`}>
-                  Next
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/search?q=${encodeURIComponent(initialQuery)}&page=${initialPage + 1}&cat=${initialCategory}`}>
+                  <ChevronRight size={18} />
                 </Link>
               </Button>
             ) : (
-              <Button variant="outline" disabled>
-                Next
+              <Button variant="ghost" size="sm" disabled>
+                <ChevronRight size={18} />
               </Button>
             )}
           </div>

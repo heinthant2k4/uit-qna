@@ -14,4 +14,8 @@ export const qnaKeys = {
   search: (query: string, page: number, category: 'all' | QuestionCategory, pageSize = SEARCH_PAGE_SIZE) =>
     ['questions', 'search', query, page, category, pageSize] as const,
   similar: (title: string) => ['questions', 'similar', title] as const,
+  profileRoot: ['profile'] as const,
+  profile: () => ['profile', 'info'] as const,
+  profileQuestions: (page: number) => ['profile', 'questions', page] as const,
+  profileAnswers: (page: number) => ['profile', 'answers', page] as const,
 };

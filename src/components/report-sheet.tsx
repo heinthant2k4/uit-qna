@@ -28,6 +28,9 @@ export function ReportSheet({ targetLabel, pending, onSubmit }: Props) {
       <SheetContent side="bottom">
         <SheetHeader>
           <SheetTitle>Report {targetLabel}</SheetTitle>
+          <p className="text-sm text-[rgb(var(--muted))]">
+            Quiet moderation. Reports are private and reviewed by trust-weighted rules.
+          </p>
         </SheetHeader>
 
         <TextAreaField

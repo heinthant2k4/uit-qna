@@ -48,10 +48,10 @@ export function TextAreaField({
           onChange(event.currentTarget.value);
           if (ref.current) resize(ref.current);
         }}
-        className="resize-none"
+        className="resize-none leading-relaxed"
       />
       {maxLength ? (
-        <p className="text-right text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="text-right text-caption text-[rgb(var(--muted))]">
           {value.length}/{maxLength}
         </p>
       ) : null}

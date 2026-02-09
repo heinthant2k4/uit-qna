@@ -1,13 +1,28 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import Script from 'next/script';
 
 import { QueryProvider } from '../components/providers/query-provider';
+import { PwaRegister } from '../components/pwa-register';
 import './globals.css';
+
+export const viewport: Viewport = {
+  themeColor: '#0b1220',
+};
 
 export const metadata: Metadata = {
   title: 'Anonymous Student Q&A',
   description: 'Mobile-first anonymous Q&A and civic-safe student voice platform.',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Anon Q&A',
+  },
+  icons: {
+    icon: '/maskable-icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 type Props = {
@@ -29,6 +44,7 @@ export default function RootLayout({ children }: Props) {
             }
           })();`}
         </Script>
+        <PwaRegister />
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

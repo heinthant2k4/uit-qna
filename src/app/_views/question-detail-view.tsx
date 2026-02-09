@@ -14,7 +14,9 @@ import { TextAreaField } from '../../components/text-area-field';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { useAnswerMutation } from '../../hooks/mutations/use-answer-mutation';
+import { useReplyMutation } from '../../hooks/mutations/use-reply-mutation';
 import { useReportMutation } from '../../hooks/mutations/use-report-mutation';
+import { useVerifyMutation } from '../../hooks/mutations/use-verify-mutation';
 import { useVoteMutation } from '../../hooks/mutations/use-vote-mutation';
 import { useQuestionDetail } from '../../hooks/queries/use-question-detail';
 import { deleteUploadedImages, uploadPostImages, validateImageFiles } from '../../lib/qna/image-upload';
@@ -29,27 +31,30 @@ export function QuestionDetailView({ questionId }: Props) {
   const voteMutation = useVoteMutation();
   const answerMutation = useAnswerMutation();
   const reportMutation = useReportMutation();
+  const verifyMutation = useVerifyMutation();
+  const replyMutation = useReplyMutation();
 
   const [answerBody, setAnswerBody] = useState('');
   const [answerImageFiles, setAnswerImageFiles] = useState<File[]>([]);
   const [answerImageError, setAnswerImageError] = useState<string | null>(null);
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [answerSort, setAnswerSort] = useState<'top' | 'newest'>('top');
-
   return (
-    <AppShell nav="home" title="Question">
+    <AppShell nav="home" title="Question" subtitle="Read first, then answer if you can help">
       {questionQuery.isLoading && !questionQuery.data ? <QuestionDetailSkeleton /> : null}
 
       {questionQuery.isError ? (
         <EmptyState
           title="Question unavailable"
-          description={questionQuery.error instanceof Error ? questionQuery.error.message : 'Could not load question.'}
+          description={questionQuery.error instanceof Error ? questionQuery.error.message : 'Couldn\'t load this question'}
         />
       ) : null}
 
       {questionQuery.data ? (
-        <div className="space-y-4">
-          <div className="space-y-4">
+        <>
+        <div className="flex gap-6">
+          {/* Main content column */}
+          <div className="min-w-0 flex-1 space-y-4">
             <QuestionHeader
               question={questionQuery.data.question}
               voting={
@@ -80,7 +85,7 @@ export function QuestionDetailView({ questionId }: Props) {
             />
 
             <section className="mt-6 space-y-2">
-              <h3 className="text-xs text-neutral-500 dark:text-neutral-400">Best Answer</h3>
+              <h3 className="text-body-sm font-medium text-[rgb(var(--fg-secondary))]" id="best-answer-heading">Best answer</h3>
               {questionQuery.data.best_answer ? (
                 <AnswerCard
                   answer={questionQuery.data.best_answer}
@@ -96,6 +101,22 @@ export function QuestionDetailView({ questionId }: Props) {
                       questionId: questionQuery.data!.question.id,
                     })
                   }
+                  canVerify
+                  verifying={verifyMutation.isPending && verifyMutation.variables?.answerId === questionQuery.data.best_answer.id}
+                  onVerify={() =>
+                    verifyMutation.mutate({
+                      answerId: questionQuery.data!.best_answer!.id,
+                      questionId: questionQuery.data!.question.id,
+                    })
+                  }
+                  onReply={async (body) => {
+                    await replyMutation.mutateAsync({
+                      answerId: questionQuery.data!.best_answer!.id,
+                      questionId: questionQuery.data!.question.id,
+                      body,
+                    });
+                  }}
+                  replyPending={replyMutation.isPending}
                   reportAction={
                     <ReportSheet
                       targetLabel="answer"
@@ -112,13 +133,13 @@ export function QuestionDetailView({ questionId }: Props) {
                   }
                 />
               ) : (
-                <EmptyState title="No best answer yet" description="Answers with strong votes will surface here." />
+                <EmptyState title="No best answer yet" description="Answers with strong votes surface here" />
               )}
             </section>
 
             <section className="mt-6 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-xs text-neutral-500 dark:text-neutral-400">Other Answers</h3>
+                <h3 className="text-body-sm font-medium text-[rgb(var(--fg-secondary))]">Other answers</h3>
                 <Tabs value={answerSort} onValueChange={(value) => setAnswerSort(value === 'newest' ? 'newest' : 'top')}>
                   <TabsList className="grid w-[180px] grid-cols-2">
                     <TabsTrigger value="top">Top</TabsTrigger>
@@ -127,7 +148,7 @@ export function QuestionDetailView({ questionId }: Props) {
                 </Tabs>
               </div>
               {questionQuery.data.other_answers.length === 0 ? (
-                <EmptyState title="No additional answers" description="Contribute your answer below." />
+                <EmptyState title="No other answers" description="Add yours below" />
               ) : (
                 [...questionQuery.data.other_answers]
                   .sort((a, b) =>
@@ -151,6 +172,22 @@ export function QuestionDetailView({ questionId }: Props) {
                           questionId: questionQuery.data!.question.id,
                         })
                       }
+                      canVerify
+                      verifying={verifyMutation.isPending && verifyMutation.variables?.answerId === answer.id}
+                      onVerify={() =>
+                        verifyMutation.mutate({
+                          answerId: answer.id,
+                          questionId: questionQuery.data!.question.id,
+                        })
+                      }
+                      onReply={async (body) => {
+                        await replyMutation.mutateAsync({
+                          answerId: answer.id,
+                          questionId: questionQuery.data!.question.id,
+                          body,
+                        });
+                      }}
+                      replyPending={replyMutation.isPending}
                       reportAction={
                         <ReportSheet
                           targetLabel="answer"
@@ -171,12 +208,28 @@ export function QuestionDetailView({ questionId }: Props) {
             </section>
           </div>
 
-          <div className="space-y-4">
-            <Card>
+          {/* Right sidebar — desktop only */}
+          <aside className="hidden w-[260px] shrink-0 space-y-4 lg:block">
+            <Card className="fade-in sticky top-20">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm">Write Answer</CardTitle>
+                <CardTitle className="text-body-sm">Tips for good answers</CardTitle>
               </CardHeader>
-              <CardContent className="p-4">
+              <CardContent className="space-y-1 p-4 text-caption text-[rgb(var(--muted))]">
+                <p>Answer the exact question first</p>
+                <p>Keep advice practical and evidence-based</p>
+                <p>Avoid personal accusations or private details</p>
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
+
+        {/* Answer form — full-width below */}
+        <div className="mt-4 space-y-4" id="answer-form">
+          <Card className="fade-in">
+            <CardHeader className="pb-0">
+              <CardTitle>Write your answer</CardTitle>
+            </CardHeader>
+              <CardContent className="p-4 md:p-5">
                 <TextAreaField
                   label="Your answer"
                   value={answerBody}
@@ -209,7 +262,7 @@ export function QuestionDetailView({ questionId }: Props) {
                     }}
                   />
                 </div>
-                {answerError ? <p className="mt-2 text-sm text-rose-700">{answerError}</p> : null}
+                {answerError ? <p role="alert" className="mt-2 text-body-sm text-[rgb(var(--negative))]">{answerError}</p> : null}
                 <PrimaryButton
                   className="mt-3 w-full"
                   disabled={answerMutation.isPending}
@@ -237,27 +290,28 @@ export function QuestionDetailView({ questionId }: Props) {
                       if (uploadedPaths.length > 0) {
                         await deleteUploadedImages(uploadedPaths);
                       }
-                      setAnswerError(error instanceof Error ? error.message : 'Could not submit answer.');
+                      setAnswerError(error instanceof Error ? error.message : 'Couldn\'t post answer');
                     }
                   }}
                 >
-                  {answerMutation.isPending ? 'Submitting...' : 'Submit Answer'}
+                  {answerMutation.isPending ? 'Submitting…' : 'Post answer'}
                 </PrimaryButton>
               </CardContent>
             </Card>
 
-            <Card>
+            {/* Tips — visible on mobile only (desktop shows in sidebar) */}
+            <Card className="fade-in lg:hidden">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm">Answering Tips</CardTitle>
+                <CardTitle>Tips for good answers</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1 p-4 text-sm text-neutral-600 dark:text-neutral-300">
-                <p>1. Answer the exact question first.</p>
-                <p>2. Keep advice practical and evidence-based.</p>
-                <p>3. Avoid personal accusations or private details.</p>
+              <CardContent className="space-y-1 p-4 md:p-5 text-body-sm text-[rgb(var(--muted))]">
+                <p>Answer the exact question first</p>
+                <p>Keep advice practical and evidence-based</p>
+                <p>Avoid personal accusations or private details</p>
               </CardContent>
             </Card>
-          </div>
         </div>
+        </>
       ) : null}
     </AppShell>
   );

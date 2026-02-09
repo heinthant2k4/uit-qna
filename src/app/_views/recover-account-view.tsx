@@ -21,18 +21,19 @@ export function RecoverAccountView() {
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <AppShell nav="home" title="Recovery Code" subtitle="Restore anonymous account access">
+    <AppShell nav="home" title="Recover session" subtitle="Regain access to your anonymous identity">
       <div className="mx-auto w-full max-w-[680px] space-y-4">
-        <Card className="h-full">
+        <Card className="fade-in h-full">
           <CardHeader className="pb-0">
-            <CardTitle className="text-sm">Generate Recovery Code</CardTitle>
+            <CardTitle>Generate recovery code</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 p-4">
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">
-              Save this code offline. It can restore your account if browser cookies are lost.
+          <CardContent className="space-y-3 p-4 md:p-5">
+            <p className="text-body-sm text-[rgb(var(--muted))]">
+              Save this code somewhere safe — it can restore your identity if cookies are cleared
             </p>
             <Button
               type="button"
+              variant="cta"
               disabled={isGenerating}
               onClick={async () => {
                 setError(null);
@@ -47,19 +48,19 @@ export function RecoverAccountView() {
                   setGeneratedCode(result.data.code);
                   setCopied(false);
                   setSavedConfirmed(false);
-                  setMessage('Recovery code created. Copy it now and save it outside this device.');
+                  setMessage('Recovery code created — copy and store it outside this device');
                 } finally {
                   setIsGenerating(false);
                 }
               }}
             >
-              {isGenerating ? 'Generating...' : 'Generate Code'}
+              {isGenerating ? 'Generating…' : 'Generate code'}
             </Button>
 
             {generatedCode ? (
-              <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900">
+              <div className="space-y-3 rounded-xl border border-[rgb(var(--line))] bg-[rgb(var(--surface-2))] p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">Your recovery code</p>
+                  <p className="text-caption text-[rgb(var(--muted))]">Your recovery code</p>
                   <Button
                     type="button"
                     variant="secondary"
@@ -72,30 +73,30 @@ export function RecoverAccountView() {
                       try {
                         await navigator.clipboard.writeText(generatedCode);
                         setCopied(true);
-                        setMessage('Recovery code copied.');
+                        setMessage('Copied to clipboard');
                       } catch {
-                        setError('Could not copy automatically. Please copy the code manually.');
+                        setError('Couldn\'t copy automatically — please select and copy manually');
                       } finally {
                         setIsCopying(false);
                       }
                     }}
                   >
-                    {isCopying ? 'Copying...' : copied ? 'Copied' : 'Copy code'}
+                    {isCopying ? 'Copying…' : copied ? 'Copied' : 'Copy code'}
                   </Button>
                 </div>
-                <p className="break-all font-mono text-sm font-semibold text-neutral-900 dark:text-neutral-100">{generatedCode}</p>
-                <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
+                <p className="break-all font-mono text-body-sm font-semibold text-[rgb(var(--fg))]">{generatedCode}</p>
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg py-2 text-caption text-[rgb(var(--fg))]">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-neutral-300"
+                    className="h-5 w-5 rounded border-[rgb(var(--line-strong))] accent-[rgb(var(--accent))] focus-visible:ring-2 focus-visible:ring-[rgb(var(--accent))]/40 focus-visible:ring-offset-2"
                     checked={savedConfirmed}
                     onChange={(event) => setSavedConfirmed(event.currentTarget.checked)}
                   />
-                  I saved this code in a secure place.
+                  I saved this code in a secure place
                 </label>
                 {!savedConfirmed ? (
-                  <p className="text-xs text-amber-700">
-                    If you lose this code, your anonymous account cannot be recovered.
+                  <p className="text-caption text-[rgb(var(--caution))]">
+                    If you lose this code your anonymous identity cannot be recovered
                   </p>
                 ) : null}
               </div>
@@ -103,13 +104,13 @@ export function RecoverAccountView() {
           </CardContent>
         </Card>
 
-        <Card className="h-full">
+        <Card className="fade-in h-full">
           <CardHeader className="pb-0">
-            <CardTitle className="text-sm">Recover With Code</CardTitle>
+            <CardTitle>Recover with code</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 p-4">
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">
-              Use this from a fresh anonymous session. Current session must not have existing posts, votes, or reports.
+          <CardContent className="space-y-3 p-4 md:p-5">
+            <p className="text-body-sm text-[rgb(var(--muted))]">
+              Open this from a fresh session — your current session must have no posts, votes, or reports
             </p>
             <div className="space-y-2">
               <Label htmlFor="recovery-code-input">Recovery code</Label>
@@ -122,6 +123,7 @@ export function RecoverAccountView() {
             </div>
             <Button
               type="button"
+              variant="cta"
               disabled={isRecovering}
               onClick={async () => {
                 setError(null);
@@ -133,20 +135,20 @@ export function RecoverAccountView() {
                     setError(result.error);
                     return;
                   }
-                  setMessage('Account recovered successfully. Reload the app to refresh all data.');
+                  setMessage('Session recovered — reload the app to refresh your data');
                   setRecoveryCode('');
                 } finally {
                   setIsRecovering(false);
                 }
               }}
             >
-              {isRecovering ? 'Recovering...' : 'Recover Account'}
+              {isRecovering ? 'Recovering…' : 'Recover session'}
             </Button>
           </CardContent>
         </Card>
       </div>
-      {message ? <p className="mx-auto mt-4 w-full max-w-[820px] text-sm text-emerald-700">{message}</p> : null}
-      {error ? <p className="mx-auto mt-2 w-full max-w-[820px] text-sm text-rose-700">{error}</p> : null}
+      {message ? <p aria-live="polite" className="mx-auto mt-4 w-full max-w-[680px] text-body-sm text-[rgb(var(--positive))]">{message}</p> : null}
+      {error ? <p role="alert" className="mx-auto mt-2 w-full max-w-[680px] text-body-sm text-[rgb(var(--negative))]">{error}</p> : null}
     </AppShell>
   );
 }

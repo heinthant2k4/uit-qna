@@ -3,9 +3,8 @@ import { LoadingList } from '../components/loading-list';
 
 export default function Loading() {
   return (
-    <AppShell nav="home" title="Loading">
+    <AppShell nav="home" title="Campus questions" subtitle="Loading">
       <LoadingList />
     </AppShell>
   );
 }
-

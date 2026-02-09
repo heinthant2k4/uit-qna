@@ -3,7 +3,7 @@ import { QuestionDetailSkeleton } from '../../../components/question-detail-skel
 
 export default function LoadingQuestion() {
   return (
-    <AppShell nav="home" title="Question">
+    <AppShell nav="home" title="Question" subtitle="Loading">
       <QuestionDetailSkeleton />
     </AppShell>
   );

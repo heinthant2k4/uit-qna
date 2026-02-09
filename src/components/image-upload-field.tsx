@@ -43,10 +43,10 @@ export function ImageUploadField({
           if (selected.length) onAddFiles(selected);
           event.currentTarget.value = '';
         }}
-        className="block w-full file:mr-3 file:min-h-11 file:rounded-xl file:border-0 file:bg-neutral-100 file:px-3 file:text-xs file:font-semibold dark:file:bg-neutral-800"
+        className="block w-full file:mr-3 file:min-h-11 file:rounded-xl file:border-0 file:bg-[rgb(var(--surface-2))] file:px-3 file:text-xs file:font-semibold file:text-[rgb(var(--fg))]"
       />
 
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">Up to {maxFiles} images. Converted to WEBP automatically.</p>
+      <p className="text-xs text-[rgb(var(--muted))]">Up to {maxFiles} images. Converted to WEBP automatically.</p>
 
       {error ? <p className="text-xs text-rose-700">{error}</p> : null}
 
@@ -57,8 +57,8 @@ export function ImageUploadField({
               <Card>
                 <CardContent className="flex items-center justify-between p-2">
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{file.name}</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">{formatFileSize(file.size)}</p>
+                    <p className="truncate text-xs font-medium text-[rgb(var(--fg))]">{file.name}</p>
+                    <p className="text-xs text-[rgb(var(--muted))]">{formatFileSize(file.size)}</p>
                   </div>
                   <Button
                     type="button"

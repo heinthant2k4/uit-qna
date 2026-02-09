@@ -1,28 +1,51 @@
-import { ArrowUp } from 'lucide-react';
-
+import { cn } from '../lib/utils';
 import { Button } from './ui/button';
+import { ArrowUp } from 'react-feather';
 
 type Props = {
   score: number;
   disabled?: boolean;
   onVote: () => void;
+  /** Show in vertical column layout (default) or inline row */
+  layout?: 'column' | 'row';
 };
 
-export function VoteButton({ score, disabled, onVote }: Props) {
+export function VoteButton({ score, disabled, onVote, layout = 'column' }: Props) {
+  const isColumn = layout === 'column';
+
   return (
-    <div className="flex items-center gap-1.5">
+    <div
+      className={cn(
+        'flex items-center',
+        isColumn ? 'flex-col gap-0.5' : 'flex-row gap-1.5',
+      )}
+    >
       <Button
         type="button"
         aria-label="Upvote"
-        variant="outline"
-        size="icon"
-        className="rounded-full"
+        variant="ghost"
+        size="sm"
+        className={cn(
+          'press-scale text-[rgb(var(--muted))] hover:text-[rgb(var(--accent))] transition-colors',
+          isColumn
+            ? 'h-8 w-8 rounded-full p-0'
+            : 'rounded-full px-2.5',
+        )}
         onClick={onVote}
         disabled={disabled}
       >
-        <ArrowUp className="h-4 w-4" />
+        <ArrowUp size={18} />
       </Button>
-      <span className="min-w-8 text-center text-sm font-semibold text-neutral-700 dark:text-neutral-200">{score}</span>
+      <span
+        className={cn(
+          'font-semibold tabular-nums',
+          isColumn
+            ? 'text-body-sm text-[rgb(var(--fg))]'
+            : 'min-w-[1.5rem] text-center text-caption text-[rgb(var(--fg-secondary))]',
+        )}
+      >
+        {score}
+      </span>
     </div>
   );
 }

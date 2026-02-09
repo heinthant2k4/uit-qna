@@ -559,7 +559,7 @@ export async function createAnswer(
   }
 }
 
-export async function vote(input: VoteInput): Promise<ActionResult<{ applied: boolean }>> {
+export async function vote(input: VoteInput): Promise<ActionResult<{ applied: boolean; score: number }>> {
   try {
     const targetId = input.targetId?.trim();
 
@@ -589,7 +589,17 @@ export async function vote(input: VoteInput): Promise<ActionResult<{ applied: bo
       return { ok: false, error: error.message, code: error.code ?? 'VOTE_FAILED' };
     }
 
-    return { ok: true, data: { applied: true } };
+    const { data: target, error: targetError } = await userClient
+      .from(input.targetType === 'question' ? 'questions' : 'answers')
+      .select('score')
+      .eq('id', targetId)
+      .single();
+
+    if (targetError) {
+      throw new Error(`VOTE_READBACK_FAILED:${targetError.message}`);
+    }
+
+    return { ok: true, data: { applied: true, score: target.score ?? 0 } };
   } catch (error) {
     return toActionError(error, 'VOTE_FAILED');
   }
@@ -650,5 +660,340 @@ export async function report(input: ReportInput): Promise<ActionResult<{ submitt
     };
   } catch (error) {
     return toActionError(error, 'REPORT_FAILED');
+  }
+}
+
+// ─── Verify Answer ────────────────────────────────────────────
+
+interface VerifyAnswerInput {
+  answerId: string;
+  questionId: string;
+}
+
+export async function verifyAnswer(
+  input: VerifyAnswerInput,
+): Promise<ActionResult<{ verified: boolean }>> {
+  try {
+    const answerId = input.answerId?.trim();
+    const questionId = input.questionId?.trim();
+
+    if (!answerId || !isUuid(answerId)) {
+      throw new Error('INVALID_INPUT:Invalid answer ID.');
+    }
+    if (!questionId || !isUuid(questionId)) {
+      throw new Error('INVALID_INPUT:Invalid question ID.');
+    }
+
+    const adminClient = createServiceRoleClient();
+    const { userId } = await getAuthenticatedUserId();
+    await ensureUserRow(adminClient, userId);
+
+    // Only the question author can verify an answer
+    const { data: question, error: questionError } = await adminClient
+      .from('questions')
+      .select('id, author_id')
+      .eq('id', questionId)
+      .single();
+
+    if (questionError || !question) {
+      return { ok: false, error: 'Question not found.', code: 'QUESTION_NOT_FOUND' };
+    }
+    if (question.author_id !== userId) {
+      return { ok: false, error: 'Only the question author can verify answers.', code: 'FORBIDDEN' };
+    }
+
+    // Toggle is_verified
+    const { data: answer, error: answerError } = await adminClient
+      .from('answers')
+      .select('id, is_verified')
+      .eq('id', answerId)
+      .eq('question_id', questionId)
+      .single();
+
+    if (answerError || !answer) {
+      return { ok: false, error: 'Answer not found.', code: 'ANSWER_NOT_FOUND' };
+    }
+
+    const nextVerified = !answer.is_verified;
+    const { error: updateError } = await adminClient
+      .from('answers')
+      .update({ is_verified: nextVerified })
+      .eq('id', answerId);
+
+    if (updateError) {
+      return { ok: false, error: updateError.message, code: 'VERIFY_FAILED' };
+    }
+
+    return { ok: true, data: { verified: nextVerified } };
+  } catch (error) {
+    return toActionError(error, 'VERIFY_FAILED');
+  }
+}
+
+// ─── Answer Replies ───────────────────────────────────────────
+
+interface CreateReplyInput {
+  answerId: string;
+  questionId: string;
+  body: string;
+}
+
+export async function createReply(
+  input: CreateReplyInput,
+): Promise<ActionResult<{ id: string; createdAt: string }>> {
+  try {
+    const answerId = input.answerId?.trim();
+    const questionId = input.questionId?.trim();
+    const body = input.body?.trim();
+
+    if (!answerId || !isUuid(answerId)) {
+      throw new Error('INVALID_INPUT:Invalid answer ID.');
+    }
+    if (!questionId || !isUuid(questionId)) {
+      throw new Error('INVALID_INPUT:Invalid question ID.');
+    }
+    if (!body) {
+      throw new Error('INVALID_INPUT:Reply body cannot be empty.');
+    }
+    if (body.length > 1000) {
+      throw new Error('INVALID_INPUT:Reply must be under 1000 characters.');
+    }
+
+    const adminClient = createServiceRoleClient();
+    const { userClient, userId } = await getAuthenticatedUserId();
+    await ensureUserRow(adminClient, userId);
+    await enforceRateLimit(adminClient, userId, 'createAnswer');
+
+    // Verify answer exists and belongs to an active question
+    const { data: answer, error: answerError } = await userClient
+      .from('answers')
+      .select('id, question_id')
+      .eq('id', answerId)
+      .eq('question_id', questionId)
+      .single();
+
+    if (answerError || !answer) {
+      return { ok: false, error: 'Answer not found.', code: 'ANSWER_NOT_FOUND' };
+    }
+
+    const { data, error } = await userClient
+      .from('answer_replies')
+      .insert({
+        answer_id: answerId,
+        author_id: userId,
+        body,
+      })
+      .select('id, created_at')
+      .single();
+
+    if (error) {
+      return { ok: false, error: error.message, code: error.code ?? 'REPLY_CREATE_FAILED' };
+    }
+
+    return {
+      ok: true,
+      data: {
+        id: data.id,
+        createdAt: data.created_at,
+      },
+    };
+  } catch (error) {
+    return toActionError(error, 'REPLY_CREATE_FAILED');
+  }
+}
+
+// ─── Edit Question ────────────────────────────────────────────
+
+interface EditQuestionInput {
+  questionId: string;
+  title: string;
+  body: string;
+}
+
+export async function editQuestion(
+  input: EditQuestionInput,
+): Promise<ActionResult<{ updatedAt: string }>> {
+  try {
+    const questionId = input.questionId?.trim();
+    const title = input.title?.trim();
+    const body = input.body?.trim();
+
+    if (!questionId || !isUuid(questionId)) {
+      throw new Error('INVALID_INPUT:Invalid question ID.');
+    }
+    if (!title) throw new Error('INVALID_INPUT:Title cannot be empty.');
+    if (!body) throw new Error('INVALID_INPUT:Body cannot be empty.');
+
+    const adminClient = createServiceRoleClient();
+    const { userId } = await getAuthenticatedUserId();
+    await ensureUserRow(adminClient, userId);
+
+    // Verify ownership
+    const { data: question, error: qErr } = await adminClient
+      .from('questions')
+      .select('id, author_id')
+      .eq('id', questionId)
+      .single();
+
+    if (qErr || !question) {
+      return { ok: false, error: 'Question not found.', code: 'NOT_FOUND' };
+    }
+    if (question.author_id !== userId) {
+      return { ok: false, error: 'You can only edit your own questions.', code: 'FORBIDDEN' };
+    }
+
+    const now = new Date().toISOString();
+    const { error: updateErr } = await adminClient
+      .from('questions')
+      .update({ title, body, updated_at: now })
+      .eq('id', questionId);
+
+    if (updateErr) {
+      return { ok: false, error: updateErr.message, code: 'EDIT_FAILED' };
+    }
+
+    return { ok: true, data: { updatedAt: now } };
+  } catch (error) {
+    return toActionError(error, 'EDIT_FAILED');
+  }
+}
+
+// ─── Delete Question ──────────────────────────────────────────
+
+export async function deleteQuestion(
+  questionId: string,
+): Promise<ActionResult<{ deleted: boolean }>> {
+  try {
+    const id = questionId?.trim();
+    if (!id || !isUuid(id)) {
+      throw new Error('INVALID_INPUT:Invalid question ID.');
+    }
+
+    const adminClient = createServiceRoleClient();
+    const { userId } = await getAuthenticatedUserId();
+    await ensureUserRow(adminClient, userId);
+
+    const { data: question, error: qErr } = await adminClient
+      .from('questions')
+      .select('id, author_id')
+      .eq('id', id)
+      .single();
+
+    if (qErr || !question) {
+      return { ok: false, error: 'Question not found.', code: 'NOT_FOUND' };
+    }
+    if (question.author_id !== userId) {
+      return { ok: false, error: 'You can only delete your own questions.', code: 'FORBIDDEN' };
+    }
+
+    const { error: delErr } = await adminClient
+      .from('questions')
+      .delete()
+      .eq('id', id);
+
+    if (delErr) {
+      return { ok: false, error: delErr.message, code: 'DELETE_FAILED' };
+    }
+
+    await drainMediaDeletionQueue(adminClient);
+    return { ok: true, data: { deleted: true } };
+  } catch (error) {
+    return toActionError(error, 'DELETE_FAILED');
+  }
+}
+
+// ─── Edit Answer ──────────────────────────────────────────────
+
+interface EditAnswerInput {
+  answerId: string;
+  body: string;
+}
+
+export async function editAnswer(
+  input: EditAnswerInput,
+): Promise<ActionResult<{ updatedAt: string }>> {
+  try {
+    const answerId = input.answerId?.trim();
+    const body = input.body?.trim();
+
+    if (!answerId || !isUuid(answerId)) {
+      throw new Error('INVALID_INPUT:Invalid answer ID.');
+    }
+    if (!body) throw new Error('INVALID_INPUT:Body cannot be empty.');
+
+    const adminClient = createServiceRoleClient();
+    const { userId } = await getAuthenticatedUserId();
+    await ensureUserRow(adminClient, userId);
+
+    const { data: answer, error: aErr } = await adminClient
+      .from('answers')
+      .select('id, author_id')
+      .eq('id', answerId)
+      .single();
+
+    if (aErr || !answer) {
+      return { ok: false, error: 'Answer not found.', code: 'NOT_FOUND' };
+    }
+    if (answer.author_id !== userId) {
+      return { ok: false, error: 'You can only edit your own answers.', code: 'FORBIDDEN' };
+    }
+
+    const now = new Date().toISOString();
+    const { error: updateErr } = await adminClient
+      .from('answers')
+      .update({ body, updated_at: now })
+      .eq('id', answerId);
+
+    if (updateErr) {
+      return { ok: false, error: updateErr.message, code: 'EDIT_FAILED' };
+    }
+
+    return { ok: true, data: { updatedAt: now } };
+  } catch (error) {
+    return toActionError(error, 'EDIT_FAILED');
+  }
+}
+
+// ─── Delete Answer ────────────────────────────────────────────
+
+export async function deleteAnswer(
+  answerId: string,
+): Promise<ActionResult<{ deleted: boolean }>> {
+  try {
+    const id = answerId?.trim();
+    if (!id || !isUuid(id)) {
+      throw new Error('INVALID_INPUT:Invalid answer ID.');
+    }
+
+    const adminClient = createServiceRoleClient();
+    const { userId } = await getAuthenticatedUserId();
+    await ensureUserRow(adminClient, userId);
+
+    const { data: answer, error: aErr } = await adminClient
+      .from('answers')
+      .select('id, author_id')
+      .eq('id', id)
+      .single();
+
+    if (aErr || !answer) {
+      return { ok: false, error: 'Answer not found.', code: 'NOT_FOUND' };
+    }
+    if (answer.author_id !== userId) {
+      return { ok: false, error: 'You can only delete your own answers.', code: 'FORBIDDEN' };
+    }
+
+    const { error: delErr } = await adminClient
+      .from('answers')
+      .delete()
+      .eq('id', id);
+
+    if (delErr) {
+      return { ok: false, error: delErr.message, code: 'DELETE_FAILED' };
+    }
+
+    await drainMediaDeletionQueue(adminClient);
+    return { ok: true, data: { deleted: true } };
+  } catch (error) {
+    return toActionError(error, 'DELETE_FAILED');
   }
 }

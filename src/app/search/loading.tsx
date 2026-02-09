@@ -3,9 +3,8 @@ import { LoadingList } from '../../components/loading-list';
 
 export default function SearchLoading() {
   return (
-    <AppShell nav="search" title="Search Questions">
+    <AppShell nav="search" title="Search" subtitle="Loading">
       <LoadingList />
     </AppShell>
   );
 }
-

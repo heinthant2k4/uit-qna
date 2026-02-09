@@ -47,25 +47,16 @@ export function AskQuestionView() {
   const tags = useMemo(() => normalizeTags(rawTags), [rawTags]);
   const similarQuestions = useSimilarQuestions(title);
   const experienceTemplates = [
-    'Has anyone experienced',
-    'Is it normal that',
-    'What should we do when',
+    'Has anyone experienced…',
+    'Is it normal that…',
+    'What should we do when…',
   ];
 
   return (
-    <AppShell nav="ask" title="Ask a Question" subtitle="Anonymous, precise, and helpful">
-      <div className="space-y-4">
-        <div className="space-y-4">
-          <Card className="md:hidden">
-            <CardContent className="space-y-2 p-4 text-sm text-neutral-600 dark:text-neutral-300">
-              <p className="font-medium text-neutral-900 dark:text-neutral-100">Ask calmly and clearly.</p>
-              <p>
-                For experience questions, frame with: “Has anyone experienced…”, “Is it normal that…”, or “What should
-                we do when…”.
-              </p>
-            </CardContent>
-          </Card>
-
+    <AppShell nav="ask" title="Ask a question" subtitle="Clear questions receive better answers">
+      <div className="flex gap-6">
+        {/* Main form column */}
+        <div className="min-w-0 flex-1 space-y-4">
           <form
             className="space-y-4"
             onSubmit={async (event) => {
@@ -95,25 +86,25 @@ export function AskQuestionView() {
                 if (uploadedPaths.length > 0) {
                   await deleteUploadedImages(uploadedPaths);
                 }
-                setFormError(error instanceof Error ? error.message : 'Could not create question.');
+                setFormError(error instanceof Error ? error.message : 'Couldn\'t create question');
               }
             }}
           >
-            <Card>
+            <Card className="fade-in">
               <CardHeader className="pb-0">
-                <CardTitle>Ask Question</CardTitle>
+                <CardTitle>New question</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 p-4">
                 {category !== 'academic' ? (
                   <div className="space-y-2">
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Experience framing templates</p>
+                    <p className="text-caption text-[rgb(var(--muted))]">Suggested starters</p>
                     <div className="flex flex-wrap gap-2">
                       {experienceTemplates.map((template) => (
                         <Button
                           key={template}
                           type="button"
                           variant="outline"
-                          className="text-xs"
+                          className="text-caption"
                           onClick={() => {
                             if (title.trim().length > 0) return;
                             setTitle(`${template} ...`);
@@ -132,7 +123,7 @@ export function AskQuestionView() {
                     id="question-title"
                     value={title}
                     onChange={(event) => setTitle(event.currentTarget.value)}
-                    placeholder="Describe the question clearly"
+                    placeholder="how does the grading curve work?"
                   />
                 </div>
 
@@ -141,7 +132,7 @@ export function AskQuestionView() {
                   value={body}
                   onChange={setBody}
                   minRows={6}
-                  placeholder="Include context, constraints, and what you already tried."
+                  placeholder="add context, what you've tried, and any constraints"
                 />
 
                 <ImageUploadField
@@ -173,7 +164,7 @@ export function AskQuestionView() {
                     id="question-tags"
                     value={rawTags}
                     onChange={(event) => setRawTags(event.currentTarget.value)}
-                    placeholder="e.g. calculus, hostel, exam-policy"
+                    placeholder="e.g. econometrics, library-hours, deferral-policy"
                   />
                   <div className="flex flex-wrap gap-1.5">
                     {tags.map((tag) => (
@@ -188,7 +179,7 @@ export function AskQuestionView() {
                     id="question-category"
                     value={category}
                     onChange={(event) => setCategory(event.currentTarget.value as typeof category)}
-                    className="flex min-h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none ring-offset-white focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                    className="flex min-h-[44px] w-full rounded-xl border border-[rgb(var(--line))] bg-[rgb(var(--surface))] px-3 text-body-sm text-[rgb(var(--fg))] outline-none focus-visible:border-[rgb(var(--accent))] focus-visible:ring-2 focus-visible:ring-[rgb(var(--accent))]/30 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <option value="academic">Academic</option>
                     <option value="facilities">Facilities</option>
@@ -196,24 +187,25 @@ export function AskQuestionView() {
                   </select>
                 </div>
 
-                {formError ? <p className="text-sm text-rose-700">{formError}</p> : null}
+                {formError ? <p role="alert" className="text-body-sm text-[rgb(var(--negative))]">{formError}</p> : null}
 
-                <Button type="submit" className="w-full" disabled={createQuestionMutation.isPending}>
-                  {createQuestionMutation.isPending ? 'Submitting...' : 'Post Question'}
+                <Button type="submit" variant="cta" className="w-full" disabled={createQuestionMutation.isPending}>
+                  {createQuestionMutation.isPending ? 'Submitting…' : 'Post question'}
                 </Button>
               </CardContent>
             </Card>
           </form>
         </div>
 
-        <aside className="space-y-4">
-          <Card>
+        {/* Right sidebar — desktop only */}
+        <aside className="hidden w-[260px] shrink-0 space-y-4 lg:block">
+          <Card className="fade-in">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm">Similar Questions</CardTitle>
+              <CardTitle className="text-body-sm">Similar questions</CardTitle>
             </CardHeader>
-            <CardContent className="p-4">
+            <CardContent className="p-4 md:p-5">
               {similarQuestions.isLoading ? (
-                <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Checking similar posts...</p>
+                <p className="mt-2 text-body-sm text-[rgb(var(--muted))]">Checking…</p>
               ) : null}
 
               {similarQuestions.data && similarQuestions.data.length > 0 ? (
@@ -222,10 +214,10 @@ export function AskQuestionView() {
                     <Link
                       key={question.id}
                       href={`/q/${question.public_id}`}
-                      className="block rounded-xl border border-neutral-200 p-3 text-sm text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+                      className="block rounded-xl border border-[rgb(var(--line))] p-3 text-body-sm text-[rgb(var(--fg))] hover:bg-[rgb(var(--surface-2))] transition-colors"
                     >
-                      <p className="font-medium text-neutral-900 dark:text-neutral-100">{question.title}</p>
-                      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{question.answer_count} answers</p>
+                      <p className="font-medium">{question.title}</p>
+                      <p className="mt-1 text-caption text-[rgb(var(--muted))]">{question.answer_count} answers</p>
                     </Link>
                   ))}
                 </div>
@@ -233,23 +225,69 @@ export function AskQuestionView() {
 
               {title.trim().length >= 8 && similarQuestions.data?.length === 0 && !similarQuestions.isLoading ? (
                 <div className="mt-2">
-                  <EmptyState title="No close matches" description="Your question appears new. Post when ready." />
+                  <EmptyState title="No close matches" description="Your question looks new. Ready to post?" />
                 </div>
               ) : null}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="fade-in">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm">Posting Guidelines</CardTitle>
+              <CardTitle className="text-body-sm">Guidelines</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1 p-4 text-sm text-neutral-600 dark:text-neutral-300">
-              <p>1. Be specific about context and what you tried.</p>
-              <p>2. Keep experience questions factual, calm, and non-accusatory.</p>
-              <p>3. Include only information needed to solve the issue.</p>
+            <CardContent className="space-y-1 p-4 md:p-5 text-caption text-[rgb(var(--muted))]">
+              <p>Be specific about context and steps already tried</p>
+              <p>Keep personal experiences calm and factual</p>
+              <p>Include only details needed to answer</p>
             </CardContent>
           </Card>
         </aside>
+      </div>
+
+      {/* Similar questions + guidelines shown below form on mobile */}
+      <div className="mt-4 space-y-4 lg:hidden">
+        <Card className="fade-in">
+          <CardHeader className="pb-0">
+            <CardTitle>Similar questions</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-5">
+            {similarQuestions.isLoading ? (
+              <p className="mt-2 text-body-sm text-[rgb(var(--muted))]">Checking…</p>
+            ) : null}
+
+            {similarQuestions.data && similarQuestions.data.length > 0 ? (
+              <div className="mt-2 space-y-2">
+                {similarQuestions.data.map((question) => (
+                  <Link
+                    key={question.id}
+                    href={`/q/${question.public_id}`}
+                    className="block rounded-xl border border-[rgb(var(--line))] p-3 text-body-sm text-[rgb(var(--fg))] hover:bg-[rgb(var(--surface-2))] transition-colors"
+                  >
+                    <p className="font-medium">{question.title}</p>
+                    <p className="mt-1 text-caption text-[rgb(var(--muted))]">{question.answer_count} answers</p>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+
+            {title.trim().length >= 8 && similarQuestions.data?.length === 0 && !similarQuestions.isLoading ? (
+              <div className="mt-2">
+                <EmptyState title="No close matches" description="Your question looks new. Ready to post?" />
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="fade-in">
+          <CardHeader className="pb-0">
+            <CardTitle>Guidelines</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 p-4 md:p-5 text-body-sm text-[rgb(var(--muted))]">
+            <p>Be specific about context and steps already tried</p>
+            <p>Keep personal experiences calm and factual</p>
+            <p>Include only details needed to answer</p>
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );

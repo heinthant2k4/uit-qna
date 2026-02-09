@@ -1,9 +1,14 @@
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
+import type { Metadata } from 'next';
 
 import { SearchView } from '../_views/search-view';
 import { searchQuestions } from '../../lib/qna/data';
 import { qnaKeys, SEARCH_PAGE_SIZE } from '../../lib/qna/query-keys';
 import { createUserServerClient } from '../../lib/supabase/server';
+
+export const metadata: Metadata = {
+  title: 'Search',
+};
 
 type SearchParams = {
   q?: string | string[];

@@ -2,24 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Crystal Clear palette ──────────────────────────────────── */
+
 :root {
-  --bg: 245 245 245;
-  --fg: 23 23 23;
+  --bg: 246 250 252;
+  --bg-elevated: 236 246 248;
+  --fg: 18 28 38;
   --surface: 255 255 255;
-  --surface-muted: 240 240 240;
-  --muted: 115 115 115;
+  --surface-2: 242 251 251;
+  --line: 210 230 234;
+  --line-strong: 176 210 216;
+  --muted: 90 116 128;
+  --accent: 0 206 209;
+  --accent-soft: 175 238 238;
 }
 
 .dark {
-  --bg: 8 8 8;
-  --fg: 245 245 245;
-  --surface: 23 23 23;
-  --surface-muted: 38 38 38;
-  --muted: 163 163 163;
+  --bg: 12 22 30;
+  --bg-elevated: 16 28 38;
+  --fg: 226 240 244;
+  --surface: 22 36 46;
+  --surface-2: 28 44 56;
+  --line: 48 72 86;
+  --line-strong: 72 100 116;
+  --muted: 148 178 190;
+  --accent: 0 206 209;
+  --accent-soft: 0 145 150;
 }
 
 * {
   box-sizing: border-box;
+  border-color: rgb(var(--line));
 }
 
 html,
@@ -30,25 +43,145 @@ body {
 }
 
 body {
-  font-family: var(--font-sans), sans-serif;
+  font-family:
+    "Inter",
+    "SF Pro Text",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
   color: rgb(var(--fg));
-  background: rgb(var(--bg));
-}
-
-@media (min-width: 768px) {
-  body {
-    background:
-      radial-gradient(circle at top, rgb(var(--surface-muted) / 0.45), transparent 58%),
-      rgb(var(--bg));
-  }
+  background:
+    radial-gradient(1400px 620px at 50% -120px, rgb(var(--bg-elevated) / 0.95), transparent 62%),
+    linear-gradient(rgb(var(--bg)), rgb(var(--bg)));
+  line-height: 1.45;
 }
 
 ::selection {
-  background: rgb(20 184 166 / 0.22);
+  background: rgb(0 206 209 / 0.22);
 }
 
 h1,
 h2,
 h3 {
-  font-family: var(--font-sans), sans-serif;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: inherit;
+}
+
+/* ─── View Transitions (theme toggle) ───────────────────────── */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 350ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: vt-fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: vt-fade-in;
+}
+
+@keyframes vt-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─── Apple-style micro-animations ───────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Fade-in (cards, sections) */
+  .fade-in {
+    animation: fade-in 380ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+
+  /* Staggered children — add .stagger-list on parent */
+  .stagger-list > * {
+    animation: slide-up 420ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+  .stagger-list > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-list > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger-list > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger-list > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger-list > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger-list > *:nth-child(n+6) { animation-delay: 250ms; }
+
+  /* Scale-spring (vote button press) */
+  .press-scale {
+    transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .press-scale:active {
+    transform: scale(0.92);
+  }
+
+  /* Gentle hover lift (cards) */
+  .hover-lift {
+    transition: transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 280ms ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Icon spin (theme toggle) */
+  .icon-rotate-in {
+    animation: icon-spin 450ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  /* Pulse glow (CTA button) */
+  .pulse-glow {
+    animation: pulse-glow 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes icon-spin {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgb(0 206 209 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(0 206 209 / 0.12);
+  }
 }

@@ -5,22 +5,24 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2',
+  'inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--bg))]',
   {
     variants: {
       variant: {
         default:
-          'bg-brand-500 text-white hover:bg-brand-600 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-600',
+          'bg-brand-500 text-white hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-400 dark:text-white shadow-sm',
+        cta:
+          'bg-brand-500 text-white hover:bg-brand-600 dark:bg-brand-400 dark:hover:bg-brand-300 dark:text-gray-950 shadow-md shadow-brand-500/25 ring-1 ring-brand-400/30',
         secondary:
-          'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700',
+          'bg-brand-50 text-brand-800 hover:bg-brand-100 dark:bg-brand-900/50 dark:text-brand-200 dark:hover:bg-brand-900/80',
         outline:
-          'border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800',
-        ghost: 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800',
-        destructive: 'bg-rose-700 text-rose-50 hover:bg-rose-800',
+          'border border-[rgb(var(--line-strong))] bg-[rgb(var(--surface))] text-[rgb(var(--fg))] hover:bg-[rgb(var(--surface-2))]',
+        ghost: 'text-[rgb(var(--muted))] hover:bg-[rgb(var(--surface-2))] hover:text-[rgb(var(--fg))]',
+        destructive: 'bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600 dark:text-white',
       },
       size: {
         default: 'px-4 py-2',
-        sm: 'min-h-11 rounded-xl px-3 text-xs',
+        sm: 'min-h-11 rounded-lg px-3 text-xs',
         lg: 'min-h-12 rounded-xl px-5 text-sm',
         icon: 'h-11 w-11',
       },

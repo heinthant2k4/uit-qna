@@ -6,14 +6,13 @@ import { PrimaryButton } from '../components/primary-button';
 
 export default function NotFound() {
   return (
-    <AppShell nav="home" title="Not Found">
-      <EmptyState title="Content not found" description="This question may be hidden or removed." />
+    <AppShell nav="home" title="Not found" subtitle="This page may be hidden or no longer available">
+      <EmptyState title="Content not found" description="This question may have been hidden or removed." />
       <div className="mt-4">
         <Link href="/">
-          <PrimaryButton className="w-full">Back to Feed</PrimaryButton>
+          <PrimaryButton className="w-full">Back to feed</PrimaryButton>
         </Link>
       </div>
     </AppShell>
   );
 }
-

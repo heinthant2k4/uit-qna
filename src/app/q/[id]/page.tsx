@@ -1,4 +1,5 @@
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { QuestionDetailView } from '../../_views/question-detail-view';
@@ -9,6 +10,15 @@ import { createUserServerClient } from '../../../lib/supabase/server';
 type Props = {
   params: Promise<{ id: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const resolved = await params;
+  const supabase = await createUserServerClient();
+  const detail = await fetchQuestionDetailByPublicId(supabase, resolved.id);
+  return {
+    title: detail?.question.title ?? 'Question',
+  };
+}
 
 export default async function QuestionDetailPage({ params }: Props) {
   const resolved = await params;

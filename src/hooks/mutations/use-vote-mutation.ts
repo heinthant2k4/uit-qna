@@ -93,6 +93,56 @@ export function useVoteMutation() {
 
       return context;
     },
+    onSuccess: (data, input) => {
+      if (input.targetType === 'question') {
+        queryClient.setQueriesData<PaginatedResult<Question>>({ queryKey: qnaKeys.feedRoot }, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((item) =>
+              item.id === input.targetId ? { ...item, score: data.score } : item,
+            ),
+          };
+        });
+
+        queryClient.setQueriesData<PaginatedResult<Question>>({ queryKey: qnaKeys.searchRoot }, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((item) =>
+              item.id === input.targetId ? { ...item, score: data.score } : item,
+            ),
+          };
+        });
+
+        queryClient.setQueryData<QuestionDetail>(qnaKeys.detail(input.targetId), (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            question: { ...old.question, score: data.score },
+          };
+        });
+      } else {
+        queryClient.setQueriesData<QuestionDetail>({ queryKey: qnaKeys.detailRoot }, (old) => {
+          if (!old) return old;
+
+          const bestAnswer =
+            old.best_answer && old.best_answer.id === input.targetId
+              ? { ...old.best_answer, score: data.score }
+              : old.best_answer;
+
+          const otherAnswers = old.other_answers.map((answer) =>
+            answer.id === input.targetId ? { ...answer, score: data.score } : answer,
+          );
+
+          return {
+            ...old,
+            best_answer: bestAnswer,
+            other_answers: otherAnswers,
+          };
+        });
+      }
+    },
     onError: (_error, _input, context) => {
       if (!context) return;
       context.feed.forEach(([key, data]) => {

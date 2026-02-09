@@ -8,6 +8,8 @@ import type {
   Question,
   QuestionCategory,
   QuestionDetail,
+  Reply,
+  UserProfile,
   UserSummary,
 } from '../../types/qna';
 
@@ -36,6 +38,7 @@ interface RankedAnswerRow {
   author_anon_handle: string;
   author_color_seed: number;
   is_best: boolean;
+  is_verified?: boolean;
 }
 
 function isString(value: string | undefined): value is string {
@@ -115,6 +118,7 @@ function mapQuestionRow(row: any, urlMap: SignedUrlMap): Question {
     score: row.score,
     answer_count: row.answer_count,
     created_at: row.created_at,
+    updated_at: row.updated_at ?? null,
     author: normalizeUser(row.author),
   };
 }
@@ -128,11 +132,14 @@ function mapRankedAnswerRow(row: RankedAnswerRow, urlMap: SignedUrlMap): Answer 
     image_urls: imagePaths.map((path) => urlMap.get(path)).filter(isString),
     score: row.score,
     created_at: row.created_at,
+    updated_at: (row as any).updated_at ?? null,
     is_best: row.is_best,
+    is_verified: row.is_verified ?? false,
     author: {
       anon_handle: row.author_anon_handle,
       color_seed: row.author_color_seed,
     },
+    replies: [],
   };
 }
 
@@ -149,7 +156,7 @@ export async function fetchFeedQuestions(
   let query = client
     .from('questions')
     .select(
-      'id,public_id,title,category,image_paths,tags,score,answer_count,created_at,author:users!questions_author_id_fkey(anon_handle,color_seed)',
+      'id,public_id,title,body,category,image_paths,tags,score,answer_count,created_at,updated_at,author:users!questions_author_id_fkey(anon_handle,color_seed)',
       { count: 'exact' },
     );
 
@@ -190,7 +197,7 @@ export async function fetchQuestionDetail(
     client
       .from('questions')
       .select(
-        'id,public_id,title,body,category,image_paths,tags,score,answer_count,created_at,author:users!questions_author_id_fkey(anon_handle,color_seed)',
+        'id,public_id,title,body,category,image_paths,tags,score,answer_count,created_at,updated_at,author:users!questions_author_id_fkey(anon_handle,color_seed)',
       )
       .eq('id', questionId)
       .single(),
@@ -213,10 +220,44 @@ export async function fetchQuestionDetail(
   const question = mapQuestionRow(questionResult.data, signedMap);
   const mappedAnswers = answerRows.map((row) => mapRankedAnswerRow(row, signedMap));
 
+  // Load replies for all answers
+  const answerIds = mappedAnswers.map((a) => a.id);
+  if (answerIds.length > 0) {
+    const { data: replyRows } = await client
+      .from('answer_replies')
+      .select('id,answer_id,body,created_at,author:users!answer_replies_author_id_fkey(anon_handle,color_seed)')
+      .in('answer_id', answerIds)
+      .order('created_at', { ascending: true });
+
+    if (replyRows) {
+      const replyMap = new Map<string, Reply[]>();
+      for (const row of replyRows as any[]) {
+        const author = normalizeUser(row.author);
+        const reply: Reply = {
+          id: row.id,
+          body: row.body,
+          created_at: row.created_at,
+          updated_at: row.updated_at ?? null,
+          author,
+        };
+        const existing = replyMap.get(row.answer_id) ?? [];
+        existing.push(reply);
+        replyMap.set(row.answer_id, existing);
+      }
+      for (const answer of mappedAnswers) {
+        answer.replies = replyMap.get(answer.id) ?? [];
+      }
+    }
+  }
+
+  // Verified answers go to the top of other_answers
+  const verifiedAnswers = mappedAnswers.filter((a) => !a.is_best && a.is_verified);
+  const regularAnswers = mappedAnswers.filter((a) => !a.is_best && !a.is_verified);
+
   return {
     question,
     best_answer: mappedAnswers.find((row) => row.is_best) ?? null,
-    other_answers: mappedAnswers.filter((row) => !row.is_best),
+    other_answers: [...verifiedAnswers, ...regularAnswers],
   };
 }
 
@@ -264,7 +305,7 @@ export async function searchQuestions(
   let query = client
     .from('questions')
     .select(
-      'id,public_id,title,category,image_paths,tags,score,answer_count,created_at,author:users!questions_author_id_fkey(anon_handle,color_seed)',
+      'id,public_id,title,body,category,image_paths,tags,score,answer_count,created_at,updated_at,author:users!questions_author_id_fkey(anon_handle,color_seed)',
       { count: 'exact' },
     )
     .or(`title.ilike.%${queryText}%,body.ilike.%${queryText}%`)
@@ -318,4 +359,129 @@ export async function fetchSimilarQuestions(
   const imagePaths = rows.flatMap((row: any) => (Array.isArray(row.image_paths) ? row.image_paths : []));
   const signedMap = await buildSignedUrlMap(client, imagePaths, 680);
   return rows.map((row: any) => mapQuestionRow(row, signedMap));
+}
+
+// ─── Profile data ─────────────────────────────────────────────
+
+export async function fetchUserProfile(
+  client: SupabaseClient,
+  userId: string,
+): Promise<UserProfile | null> {
+  const { data: user, error: userError } = await client
+    .from('users')
+    .select('anon_handle,color_seed,created_at')
+    .eq('id', userId)
+    .single();
+
+  if (userError || !user) return null;
+
+  const [qCount, aCount] = await Promise.all([
+    client
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('author_id', userId),
+    client
+      .from('answers')
+      .select('id', { count: 'exact', head: true })
+      .eq('author_id', userId),
+  ]);
+
+  return {
+    anon_handle: user.anon_handle,
+    color_seed: user.color_seed,
+    joined_at: user.created_at,
+    question_count: qCount.count ?? 0,
+    answer_count: aCount.count ?? 0,
+  };
+}
+
+export async function fetchUserQuestions(
+  client: SupabaseClient,
+  userId: string,
+  page: number,
+  pageSize = 12,
+): Promise<PaginatedResult<Question>> {
+  const p = normalizePage(page);
+  const from = (p - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, count, error } = await client
+    .from('questions')
+    .select(
+      'id,public_id,title,body,category,image_paths,tags,score,answer_count,created_at,updated_at,author:users!questions_author_id_fkey(anon_handle,color_seed)',
+      { count: 'exact' },
+    )
+    .eq('author_id', userId)
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  const imagePaths = rows.flatMap((row: any) => (Array.isArray(row.image_paths) ? row.image_paths : []));
+  const signedMap = await buildSignedUrlMap(client, imagePaths, 840);
+  const items = rows.map((row: any) => ({ ...mapQuestionRow(row, signedMap), is_own: true }));
+  const total = count ?? 0;
+
+  return { items, page: p, page_size: pageSize, total, has_next: from + items.length < total };
+}
+
+export async function fetchUserAnswers(
+  client: SupabaseClient,
+  userId: string,
+  page: number,
+  pageSize = 12,
+): Promise<PaginatedResult<Answer & { question_ref: { id: string; public_id: string; title: string } }>> {
+  const p = normalizePage(page);
+  const from = (p - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, count, error } = await client
+    .from('answers')
+    .select(
+      'id,body,image_paths,score,is_best,is_verified,created_at,updated_at,author_anon_handle:users!answers_author_id_fkey(anon_handle,color_seed),question:questions!answers_question_id_fkey(id,public_id,title)',
+      { count: 'exact' },
+    )
+    .eq('author_id', userId)
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  const imagePaths = rows.flatMap((row: any) => (Array.isArray(row.image_paths) ? row.image_paths : []));
+  const signedMap = await buildSignedUrlMap(client, imagePaths, 840);
+
+  const items = rows.map((row: any) => {
+    const ip = Array.isArray(row.image_paths) ? row.image_paths : [];
+    const authorRaw = row.author_anon_handle;
+    const author = Array.isArray(authorRaw) ? authorRaw[0] : authorRaw;
+    const questionRaw = row.question;
+    const question = Array.isArray(questionRaw) ? questionRaw[0] : questionRaw;
+
+    return {
+      id: row.id,
+      body: row.body ?? '',
+      image_urls: ip.map((path: string) => signedMap.get(path)).filter(isString),
+      score: row.score,
+      is_best: row.is_best ?? false,
+      is_verified: row.is_verified ?? false,
+      created_at: row.created_at,
+      updated_at: row.updated_at ?? null,
+      author: {
+        anon_handle: author?.anon_handle ?? 'Anonymous',
+        color_seed: author?.color_seed ?? 0,
+      },
+      replies: [] as Reply[],
+      is_own: true,
+      question_ref: {
+        id: question?.id ?? '',
+        public_id: question?.public_id ?? '',
+        title: question?.title ?? 'Untitled',
+      },
+    };
+  });
+
+  const total = count ?? 0;
+  return { items, page: p, page_size: pageSize, total, has_next: from + items.length < total };
 }
