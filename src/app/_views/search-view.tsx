@@ -11,6 +11,7 @@ import { LoadingList } from '../../components/loading-list';
 import { QuestionCard } from '../../components/question-card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { useIdentityGate } from '../../components/providers/identity-gate-provider';
 import { useVoteMutation } from '../../hooks/mutations/use-vote-mutation';
 import { useSearchQuestions } from '../../hooks/queries/use-search-questions';
 
@@ -43,6 +44,7 @@ export function SearchView({ initialQuery, initialPage, initialCategory }: Props
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const voteMutation = useVoteMutation();
+  const { requireIdentity } = useIdentityGate();
   const result = useSearchQuestions(initialQuery, initialPage, initialCategory);
 
   const totalPages = result.data ? Math.max(1, Math.ceil(result.data.total / result.data.page_size)) : 1;
@@ -141,10 +143,14 @@ export function SearchView({ initialQuery, initialPage, initialCategory }: Props
                 href={`/q/${question.public_id}`}
                 voting={voteMutation.isPending && voteMutation.variables?.targetId === question.id}
                 onVote={() =>
-                  voteMutation.mutate({
-                    targetType: 'question',
-                    targetId: question.id,
-                  })
+                  void requireIdentity(
+                    () =>
+                      voteMutation.mutate({
+                        targetType: 'question',
+                        targetId: question.id,
+                      }),
+                    { reason: 'vote' },
+                  )
                 }
                 showAnswerCta
               />

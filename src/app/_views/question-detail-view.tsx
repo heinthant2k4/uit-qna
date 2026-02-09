@@ -13,6 +13,7 @@ import { ReportSheet } from '../../components/report-sheet';
 import { TextAreaField } from '../../components/text-area-field';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { useIdentityGate } from '../../components/providers/identity-gate-provider';
 import { useAnswerMutation } from '../../hooks/mutations/use-answer-mutation';
 import { useReplyMutation } from '../../hooks/mutations/use-reply-mutation';
 import { useReportMutation } from '../../hooks/mutations/use-report-mutation';
@@ -33,6 +34,7 @@ export function QuestionDetailView({ questionId }: Props) {
   const reportMutation = useReportMutation();
   const verifyMutation = useVerifyMutation();
   const replyMutation = useReplyMutation();
+  const { requireIdentity } = useIdentityGate();
 
   const [answerBody, setAnswerBody] = useState('');
   const [answerImageFiles, setAnswerImageFiles] = useState<File[]>([]);
@@ -63,22 +65,30 @@ export function QuestionDetailView({ questionId }: Props) {
                 voteMutation.variables?.targetId === questionQuery.data.question.id
               }
               onVote={() =>
-                voteMutation.mutate({
-                  targetType: 'question',
-                  targetId: questionQuery.data.question.id,
-                })
+                void requireIdentity(
+                  () =>
+                    voteMutation.mutate({
+                      targetType: 'question',
+                      targetId: questionQuery.data!.question.id,
+                    }),
+                  { reason: 'vote' },
+                )
               }
               reportAction={
                 <ReportSheet
                   targetLabel="question"
                   pending={reportMutation.isPending}
                   onSubmit={async (reason) => {
-                    await reportMutation.mutateAsync({
-                      targetType: 'question',
-                      targetId: questionQuery.data!.question.id,
-                      questionId: questionQuery.data!.question.id,
-                      reason,
-                    });
+                    await requireIdentity(
+                      () =>
+                        reportMutation.mutateAsync({
+                          targetType: 'question',
+                          targetId: questionQuery.data!.question.id,
+                          questionId: questionQuery.data!.question.id,
+                          reason,
+                        }),
+                      { reason: 'report' },
+                    );
                   }}
                 />
               }
@@ -95,26 +105,38 @@ export function QuestionDetailView({ questionId }: Props) {
                     voteMutation.variables?.targetId === questionQuery.data.best_answer.id
                   }
                   onVote={() =>
-                    voteMutation.mutate({
-                      targetType: 'answer',
-                      targetId: questionQuery.data!.best_answer!.id,
-                      questionId: questionQuery.data!.question.id,
-                    })
+                    void requireIdentity(
+                      () =>
+                        voteMutation.mutate({
+                          targetType: 'answer',
+                          targetId: questionQuery.data!.best_answer!.id,
+                          questionId: questionQuery.data!.question.id,
+                        }),
+                      { reason: 'vote' },
+                    )
                   }
                   canVerify
                   verifying={verifyMutation.isPending && verifyMutation.variables?.answerId === questionQuery.data.best_answer.id}
                   onVerify={() =>
-                    verifyMutation.mutate({
-                      answerId: questionQuery.data!.best_answer!.id,
-                      questionId: questionQuery.data!.question.id,
-                    })
+                    void requireIdentity(
+                      () =>
+                        verifyMutation.mutate({
+                          answerId: questionQuery.data!.best_answer!.id,
+                          questionId: questionQuery.data!.question.id,
+                        }),
+                      { reason: 'edit' },
+                    )
                   }
                   onReply={async (body) => {
-                    await replyMutation.mutateAsync({
-                      answerId: questionQuery.data!.best_answer!.id,
-                      questionId: questionQuery.data!.question.id,
-                      body,
-                    });
+                    await requireIdentity(
+                      () =>
+                        replyMutation.mutateAsync({
+                          answerId: questionQuery.data!.best_answer!.id,
+                          questionId: questionQuery.data!.question.id,
+                          body,
+                        }),
+                      { reason: 'answer' },
+                    );
                   }}
                   replyPending={replyMutation.isPending}
                   reportAction={
@@ -122,12 +144,16 @@ export function QuestionDetailView({ questionId }: Props) {
                       targetLabel="answer"
                       pending={reportMutation.isPending}
                       onSubmit={async (reason) => {
-                        await reportMutation.mutateAsync({
-                          targetType: 'answer',
-                          targetId: questionQuery.data!.best_answer!.id,
-                          questionId: questionQuery.data!.question.id,
-                          reason,
-                        });
+                        await requireIdentity(
+                          () =>
+                            reportMutation.mutateAsync({
+                              targetType: 'answer',
+                              targetId: questionQuery.data!.best_answer!.id,
+                              questionId: questionQuery.data!.question.id,
+                              reason,
+                            }),
+                          { reason: 'report' },
+                        );
                       }}
                     />
                   }
@@ -166,26 +192,38 @@ export function QuestionDetailView({ questionId }: Props) {
                         voteMutation.variables?.targetId === answer.id
                       }
                       onVote={() =>
-                        voteMutation.mutate({
-                          targetType: 'answer',
-                          targetId: answer.id,
-                          questionId: questionQuery.data!.question.id,
-                        })
+                        void requireIdentity(
+                          () =>
+                            voteMutation.mutate({
+                              targetType: 'answer',
+                              targetId: answer.id,
+                              questionId: questionQuery.data!.question.id,
+                            }),
+                          { reason: 'vote' },
+                        )
                       }
                       canVerify
                       verifying={verifyMutation.isPending && verifyMutation.variables?.answerId === answer.id}
                       onVerify={() =>
-                        verifyMutation.mutate({
-                          answerId: answer.id,
-                          questionId: questionQuery.data!.question.id,
-                        })
+                        void requireIdentity(
+                          () =>
+                            verifyMutation.mutate({
+                              answerId: answer.id,
+                              questionId: questionQuery.data!.question.id,
+                            }),
+                          { reason: 'edit' },
+                        )
                       }
                       onReply={async (body) => {
-                        await replyMutation.mutateAsync({
-                          answerId: answer.id,
-                          questionId: questionQuery.data!.question.id,
-                          body,
-                        });
+                        await requireIdentity(
+                          () =>
+                            replyMutation.mutateAsync({
+                              answerId: answer.id,
+                              questionId: questionQuery.data!.question.id,
+                              body,
+                            }),
+                          { reason: 'answer' },
+                        );
                       }}
                       replyPending={replyMutation.isPending}
                       reportAction={
@@ -193,12 +231,16 @@ export function QuestionDetailView({ questionId }: Props) {
                           targetLabel="answer"
                           pending={reportMutation.isPending}
                           onSubmit={async (reason) => {
-                            await reportMutation.mutateAsync({
-                              targetType: 'answer',
-                              targetId: answer.id,
-                              questionId: questionQuery.data!.question.id,
-                              reason,
-                            });
+                            await requireIdentity(
+                              () =>
+                                reportMutation.mutateAsync({
+                                  targetType: 'answer',
+                                  targetId: answer.id,
+                                  questionId: questionQuery.data!.question.id,
+                                  reason,
+                                }),
+                              { reason: 'report' },
+                            );
                           }}
                         />
                       }
@@ -267,31 +309,36 @@ export function QuestionDetailView({ questionId }: Props) {
                   className="mt-3 w-full"
                   disabled={answerMutation.isPending}
                   onClick={async () => {
-                    setAnswerError(null);
-                    setAnswerImageError(null);
+                    await requireIdentity(
+                      async () => {
+                        setAnswerError(null);
+                        setAnswerImageError(null);
 
-                    const imageValidation = validateImageFiles(answerImageFiles);
-                    if (imageValidation) {
-                      setAnswerImageError(imageValidation);
-                      return;
-                    }
+                        const imageValidation = validateImageFiles(answerImageFiles);
+                        if (imageValidation) {
+                          setAnswerImageError(imageValidation);
+                          return;
+                        }
 
-                    let uploadedPaths: string[] = [];
-                    try {
-                      uploadedPaths = await uploadPostImages('answer', answerImageFiles);
-                      await answerMutation.mutateAsync({
-                        questionId,
-                        body: answerBody,
-                        imagePaths: uploadedPaths,
-                      });
-                      setAnswerBody('');
-                      setAnswerImageFiles([]);
-                    } catch (error) {
-                      if (uploadedPaths.length > 0) {
-                        await deleteUploadedImages(uploadedPaths);
-                      }
-                      setAnswerError(error instanceof Error ? error.message : 'Couldn\'t post answer');
-                    }
+                        let uploadedPaths: string[] = [];
+                        try {
+                          uploadedPaths = await uploadPostImages('answer', answerImageFiles);
+                          await answerMutation.mutateAsync({
+                            questionId,
+                            body: answerBody,
+                            imagePaths: uploadedPaths,
+                          });
+                          setAnswerBody('');
+                          setAnswerImageFiles([]);
+                        } catch (error) {
+                          if (uploadedPaths.length > 0) {
+                            await deleteUploadedImages(uploadedPaths);
+                          }
+                          setAnswerError(error instanceof Error ? error.message : 'Couldn\'t post answer');
+                        }
+                      },
+                      { reason: 'answer' },
+                    );
                   }}
                 >
                   {answerMutation.isPending ? 'Submitting…' : 'Post answer'}

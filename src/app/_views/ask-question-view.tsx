@@ -13,6 +13,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { useIdentityGate } from '../../components/providers/identity-gate-provider';
 import { useCreateQuestionMutation } from '../../hooks/mutations/use-create-question-mutation';
 import { useSimilarQuestions } from '../../hooks/queries/use-similar-questions';
 import { deleteUploadedImages, uploadPostImages, validateImageFiles } from '../../lib/qna/image-upload';
@@ -35,6 +36,7 @@ function normalizeTags(value: string): string[] {
 export function AskQuestionView() {
   const router = useRouter();
   const createQuestionMutation = useCreateQuestionMutation();
+  const { requireIdentity } = useIdentityGate();
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -61,33 +63,38 @@ export function AskQuestionView() {
             className="space-y-4"
             onSubmit={async (event) => {
               event.preventDefault();
-              setFormError(null);
-              setImageError(null);
+              await requireIdentity(
+                async () => {
+                  setFormError(null);
+                  setImageError(null);
 
-              const imageValidation = validateImageFiles(imageFiles);
-              if (imageValidation) {
-                setImageError(imageValidation);
-                return;
-              }
+                  const imageValidation = validateImageFiles(imageFiles);
+                  if (imageValidation) {
+                    setImageError(imageValidation);
+                    return;
+                  }
 
-              let uploadedPaths: string[] = [];
+                  let uploadedPaths: string[] = [];
 
-              try {
-                uploadedPaths = await uploadPostImages('question', imageFiles);
-                const result = await createQuestionMutation.mutateAsync({
-                  title,
-                  body,
-                  tags,
-                  category,
-                  imagePaths: uploadedPaths,
-                });
-                router.push(`/q/${result.publicId}`);
-              } catch (error) {
-                if (uploadedPaths.length > 0) {
-                  await deleteUploadedImages(uploadedPaths);
-                }
-                setFormError(error instanceof Error ? error.message : 'Couldn\'t create question');
-              }
+                  try {
+                    uploadedPaths = await uploadPostImages('question', imageFiles);
+                    const result = await createQuestionMutation.mutateAsync({
+                      title,
+                      body,
+                      tags,
+                      category,
+                      imagePaths: uploadedPaths,
+                    });
+                    router.push(`/q/${result.publicId}`);
+                  } catch (error) {
+                    if (uploadedPaths.length > 0) {
+                      await deleteUploadedImages(uploadedPaths);
+                    }
+                    setFormError(error instanceof Error ? error.message : 'Couldn\'t create question');
+                  }
+                },
+                { reason: 'ask' },
+              );
             }}
           >
             <Card className="fade-in">

@@ -3,11 +3,13 @@ import type { ReactNode } from 'react';
 import Script from 'next/script';
 
 import { QueryProvider } from '../components/providers/query-provider';
+import { PrivacyConsentProvider } from '../components/providers/privacy-consent-provider';
+import { IdentityGateProvider } from '../components/providers/identity-gate-provider';
 import { PwaRegister } from '../components/pwa-register';
 import './globals.css';
 
 export const viewport: Viewport = {
-  themeColor: '#0b1220',
+  themeColor: '#00CED1',
 };
 
 export const metadata: Metadata = {
@@ -45,7 +47,11 @@ export default function RootLayout({ children }: Props) {
           })();`}
         </Script>
         <PwaRegister />
-        <QueryProvider>{children}</QueryProvider>
+        <PrivacyConsentProvider>
+          <IdentityGateProvider>
+            <QueryProvider>{children}</QueryProvider>
+          </IdentityGateProvider>
+        </PrivacyConsentProvider>
       </body>
     </html>
   );

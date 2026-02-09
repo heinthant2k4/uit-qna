@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { useIdentityGate } from '../../components/providers/identity-gate-provider';
 import { useDeleteAnswerMutation } from '../../hooks/mutations/use-delete-answer-mutation';
 import { useDeleteQuestionMutation } from '../../hooks/mutations/use-delete-question-mutation';
 import { useEditAnswerMutation } from '../../hooks/mutations/use-edit-answer-mutation';
@@ -34,6 +35,7 @@ function excerpt(input: string, max = 220): string {
 }
 
 export function ProfileView({ userId }: Props) {
+  const { openGate } = useIdentityGate();
   const [tab, setTab] = useState<Tab>('questions');
   const [questionPage, setQuestionPage] = useState(1);
   const [answerPage, setAnswerPage] = useState(1);
@@ -61,7 +63,18 @@ export function ProfileView({ userId }: Props) {
   if (!userId) {
     return (
       <AppShell nav="profile" title="Profile" subtitle="Your anonymous activity">
-        <EmptyState title="Profile unavailable" description="Session is still initializing. Refresh and try again." />
+        <EmptyState
+          title="Start an anonymous session"
+          description="To view and manage your posts, we need an anonymous session on this device. No email, no name."
+        />
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <Button type="button" variant="cta" onClick={() => openGate({ reason: 'other' })}>
+            Continue anonymously
+          </Button>
+          <Button asChild type="button" variant="outline">
+            <Link href="/recover">Restore</Link>
+          </Button>
+        </div>
       </AppShell>
     );
   }
@@ -429,4 +442,3 @@ export function ProfileView({ userId }: Props) {
     </AppShell>
   );
 }
-

@@ -13,6 +13,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
+import { useIdentityGate } from '../../components/providers/identity-gate-provider';
 import { useVoteMutation } from '../../hooks/mutations/use-vote-mutation';
 import { useFeedQuestions } from '../../hooks/queries/use-feed-questions';
 import type { FeedSort } from '../../types/qna';
@@ -51,6 +52,7 @@ export function HomeFeedView({ initialSort, initialPage, initialCategory }: Prop
   const router = useRouter();
   const [search, setSearch] = useState('');
   const voteMutation = useVoteMutation();
+  const { requireIdentity } = useIdentityGate();
   const { data, isLoading, isError, error } = useFeedQuestions(initialSort, initialPage, initialCategory);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
@@ -187,10 +189,14 @@ export function HomeFeedView({ initialSort, initialPage, initialCategory }: Prop
                   showAnswerCta
                   voting={voteMutation.isPending && voteMutation.variables?.targetId === question.id}
                   onVote={() =>
-                    voteMutation.mutate({
-                      targetType: 'question',
-                      targetId: question.id,
-                    })
+                    void requireIdentity(
+                      () =>
+                        voteMutation.mutate({
+                          targetType: 'question',
+                          targetId: question.id,
+                        }),
+                      { reason: 'vote' },
+                    )
                   }
                 />
               ))}

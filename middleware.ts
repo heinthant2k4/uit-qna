@@ -41,17 +41,18 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  await supabase.auth.getUser();
 
-  if (!user) {
-    await supabase.auth.signInAnonymously();
-  }
+  // Important product behavior:
+  // - Browsing content should work without creating an identity.
+  // - Identity is created on-demand (client-side) when the user interacts (ask/answer/vote).
+  // This middleware remains to keep Supabase SSR cookies in sync when a session does exist.
 
   return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

@@ -4,12 +4,14 @@ import { useState } from 'react';
 
 import { createRecoveryCode, recoverAccountWithCode } from '../actions/qna';
 import { AppShell } from '../../components/app-shell';
+import { useIdentityGate } from '../../components/providers/identity-gate-provider';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 
 export function RecoverAccountView() {
+  const { requireIdentity } = useIdentityGate();
   const [recoveryCode, setRecoveryCode] = useState('');
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -36,22 +38,27 @@ export function RecoverAccountView() {
               variant="cta"
               disabled={isGenerating}
               onClick={async () => {
-                setError(null);
-                setMessage(null);
-                setIsGenerating(true);
-                try {
-                  const result = await createRecoveryCode();
-                  if (!result.ok) {
-                    setError(result.error);
-                    return;
-                  }
-                  setGeneratedCode(result.data.code);
-                  setCopied(false);
-                  setSavedConfirmed(false);
-                  setMessage('Recovery code created — copy and store it outside this device');
-                } finally {
-                  setIsGenerating(false);
-                }
+                await requireIdentity(
+                  async () => {
+                    setError(null);
+                    setMessage(null);
+                    setIsGenerating(true);
+                    try {
+                      const result = await createRecoveryCode();
+                      if (!result.ok) {
+                        setError(result.error);
+                        return;
+                      }
+                      setGeneratedCode(result.data.code);
+                      setCopied(false);
+                      setSavedConfirmed(false);
+                      setMessage('Recovery code created — copy and store it outside this device');
+                    } finally {
+                      setIsGenerating(false);
+                    }
+                  },
+                  { reason: 'other' },
+                );
               }}
             >
               {isGenerating ? 'Generating…' : 'Generate code'}
@@ -126,20 +133,25 @@ export function RecoverAccountView() {
               variant="cta"
               disabled={isRecovering}
               onClick={async () => {
-                setError(null);
-                setMessage(null);
-                setIsRecovering(true);
-                try {
-                  const result = await recoverAccountWithCode(recoveryCode);
-                  if (!result.ok) {
-                    setError(result.error);
-                    return;
-                  }
-                  setMessage('Session recovered — reload the app to refresh your data');
-                  setRecoveryCode('');
-                } finally {
-                  setIsRecovering(false);
-                }
+                await requireIdentity(
+                  async () => {
+                    setError(null);
+                    setMessage(null);
+                    setIsRecovering(true);
+                    try {
+                      const result = await recoverAccountWithCode(recoveryCode);
+                      if (!result.ok) {
+                        setError(result.error);
+                        return;
+                      }
+                      setMessage('Session recovered — reload the app to refresh your data');
+                      setRecoveryCode('');
+                    } finally {
+                      setIsRecovering(false);
+                    }
+                  },
+                  { reason: 'other' },
+                );
               }}
             >
               {isRecovering ? 'Recovering…' : 'Recover session'}
