@@ -52,18 +52,54 @@ function buildPageNumbers(current: number, total: number): (number | '…')[] {
 export function HomeFeedView({ initialSort, initialPage, initialCategory }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [entryLocked, setEntryLocked] = useState(false);
   const voteMutation = useVoteMutation();
   const { requireIdentity, openGate } = useIdentityGate();
   const { data, isLoading, isError, error } = useFeedQuestions(initialSort, initialPage, initialCategory);
 
   useEffect(() => {
-    // “Anonymous popup” on home feed:
-    // - Softly introduces the anonymous session concept in-context.
-    // - Does NOT create an identity; it only opens the explain modal.
-    // - Only once per browser (until storage is cleared).
+    // First-run entry gate:
+    // The user must complete the anonymous session modal before viewing the home feed
+    // on this device (only once, persisted via localStorage).
+    const entryKey = 'uit_home_entry_gate_passed_v1';
+    const introKey = 'uit_identity_gate_seen_home_v1';
+    (async () => {
+      try {
+        const supabase = getBrowserSupabaseClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (localStorage.getItem(entryKey) === '1') return;
+
+        // If the user already has an anonymous session, skip the entry gate.
+        if (sessionData.session) {
+          localStorage.setItem(entryKey, '1');
+          return;
+        }
+
+        // Lock the feed and force the identity modal (no dismiss).
+        setEntryLocked(true);
+        await requireIdentity(
+          async () => {
+            localStorage.setItem(entryKey, '1');
+            setEntryLocked(false);
+          },
+          { reason: 'other', mandatory: true },
+        );
+
+        // Also mark the “intro” popup as seen so we don’t double-prompt.
+        localStorage.setItem(introKey, '1');
+      } catch {
+        // If storage is blocked, do nothing (browsing still works).
+      }
+    })();
+  }, [openGate, requireIdentity]);
+
+  useEffect(() => {
+    // Optional soft intro for users who can browse without identity.
+    // Kept for continuity, but it will not run if the first-run gate has already fired.
     const key = 'uit_identity_gate_seen_home_v1';
     (async () => {
       try {
+        if (localStorage.getItem('uit_home_entry_gate_passed_v1') === '1') return;
         if (localStorage.getItem(key) === '1') return;
         const supabase = getBrowserSupabaseClient();
         const { data: sessionData } = await supabase.auth.getSession();
@@ -111,7 +147,22 @@ export function HomeFeedView({ initialSort, initialPage, initialCategory }: Prop
         </Button>
       }
     >
-      <div className="flex gap-6">
+      {entryLocked ? (
+        <div className="relative overflow-hidden rounded-card border border-[rgb(var(--line))] bg-[rgb(var(--surface))] p-5 md:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(var(--accent),0.16),transparent_40%),radial-gradient(circle_at_80%_30%,rgba(56,189,248,0.16),transparent_45%)]" />
+          <div className="relative space-y-2">
+            <h2 className="text-title-sm text-[rgb(var(--fg))]">One quick step</h2>
+            <p className="text-body-sm text-[rgb(var(--muted))]">
+              Create an anonymous session to keep posts editable and voting fair.
+            </p>
+            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-[rgb(var(--surface-2))]">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-brand-500/70" />
+            </div>
+          </div>
+        </div>
+      ) : (
+      <>
+      <div className="flex flex-col gap-6 lg:flex-row">
         {/* Main column */}
         <div className="min-w-0 flex-1 space-y-4">
           {/* Search bar — no card wrapper */}
@@ -340,6 +391,8 @@ export function HomeFeedView({ initialSort, initialPage, initialCategory }: Prop
           Lost your browser session? Use recovery code
         </Link>
       </div>
+      </>
+      )}
     </AppShell>
   );
 }

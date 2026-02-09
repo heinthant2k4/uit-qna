@@ -1,4 +1,11 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/offline/page": "app/offline/page.js",
   "/page": "app/page.js",
-  "/_not-found/page": "app/_not-found/page.js"
+  "/q/[id]/page": "app/q/[id]/page.js",
+  "/ask/page": "app/ask/page.js",
+  "/recover/page": "app/recover/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/search/page": "app/search/page.js"
 }

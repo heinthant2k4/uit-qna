@@ -38,6 +38,11 @@ type RequireIdentityOptions = {
    * Avoid "login" language entirely.
    */
   reason?: 'vote' | 'ask' | 'answer' | 'edit' | 'report' | 'other';
+  /**
+   * When true, the modal cannot be dismissed (used for first-run entry gating).
+   * The user must either continue anonymously or restore a previous session.
+   */
+  mandatory?: boolean;
 };
 
 type PendingAction = () => unknown | Promise<unknown>;
@@ -68,6 +73,7 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<GateStep>('explain');
   const [reason, setReason] = useState<RequireIdentityOptions['reason']>('other');
+  const [mandatory, setMandatory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const pendingActionRef = useRef<PendingAction | null>(null);
@@ -83,6 +89,7 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
     setOpen(false);
     setStep('explain');
     setReason('other');
+    setMandatory(false);
     setError(null);
     pendingActionRef.current = null;
     setRecoveryCode(null);
@@ -144,6 +151,7 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
 
   const openGate = useCallback((options?: RequireIdentityOptions) => {
     setReason(options?.reason ?? 'other');
+    setMandatory(options?.mandatory ?? false);
     setError(null);
     setStep('explain');
     setOpen(true);
@@ -190,13 +198,25 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
     <IdentityGateContext.Provider value={value}>
       {children}
 
-      <Dialog.Root open={open} onOpenChange={(next) => (next ? setOpen(true) : closeAndReset())}>
+      <Dialog.Root
+        open={open}
+        onOpenChange={(next) => {
+          if (!next && mandatory) return;
+          next ? setOpen(true) : closeAndReset();
+        }}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
           <Dialog.Content
             className={cn(
               'fixed left-1/2 top-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 -translate-y-1/2 outline-none',
             )}
+            onEscapeKeyDown={(event) => {
+              if (mandatory) event.preventDefault();
+            }}
+            onPointerDownOutside={(event) => {
+              if (mandatory) event.preventDefault();
+            }}
           >
             {/* Glassmorphic shell: reinforces “safe, anonymous space” without feeling like a login gate. */}
             <div className="rounded-card bg-gradient-to-br from-white/30 to-white/5 p-[1px] shadow-[0_24px_80px_-24px_rgba(0,0,0,0.65)] dark:from-white/15 dark:to-white/0">
@@ -210,15 +230,17 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
                     To {actionLabel}, we’ll create an anonymous session on this device.
                   </Dialog.Description>
                 </div>
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="rounded-lg p-2 text-[rgb(var(--muted))] hover:bg-[rgb(var(--surface-2))] hover:text-[rgb(var(--fg))]"
-                    aria-label="Close"
-                  >
-                    <X size={18} />
-                  </button>
-                </Dialog.Close>
+                {mandatory ? null : (
+                  <Dialog.Close asChild>
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-[rgb(var(--muted))] hover:bg-[rgb(var(--surface-2))] hover:text-[rgb(var(--fg))]"
+                      aria-label="Close"
+                    >
+                      <X size={18} />
+                    </button>
+                  </Dialog.Close>
+                )}
               </div>
 
               <div className="p-4 md:p-5">
@@ -285,9 +307,11 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
                         <Button type="button" variant="ghost" onClick={() => setStep('restore')}>
                           Restore a previous session
                         </Button>
-                        <Button type="button" variant="outline" onClick={closeAndReset}>
-                          Not now
-                        </Button>
+                        {mandatory ? null : (
+                          <Button type="button" variant="outline" onClick={closeAndReset}>
+                            Not now
+                          </Button>
+                        )}
                       </div>
 
                       <p className="text-[11px] text-[rgb(var(--muted))]">
