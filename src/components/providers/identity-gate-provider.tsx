@@ -6,7 +6,7 @@ import { Key, Shield, X } from 'react-feather';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { createRecoveryCode, recoverAccountWithCode } from '../../app/actions/qna';
+import { createRecoveryCode, profileReady, recoverAccountWithCode } from '../../app/actions/qna';
 import { getBrowserSupabaseClient } from '../../lib/supabase/browser';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -90,10 +90,24 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
     setRestoreInput('');
   }, []);
 
+  const waitForProfileReady = useCallback(async () => {
+    // Profile row is created asynchronously via DB trigger; session can exist before row is visible.
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const status = await profileReady();
+      if (status.ok) return;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error('Setting up your anonymous profile is taking longer than expected. Please try again.');
+  }, []);
+
   const ensureAnonymousSession = useCallback(async () => {
     const supabase = getBrowserSupabaseClient();
     const { data } = await supabase.auth.getSession();
-    if (data.session) return;
+    if (data.session) {
+      // Session exists but profile row may not be ready yet (common right after first sign-in).
+      await waitForProfileReady();
+      return;
+    }
 
     // We intentionally do not "auto-create" identity on page load; it happens only after explicit consent.
     const { error: signInError } = await supabase.auth.signInAnonymously();
@@ -103,7 +117,9 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
 
     // Refresh server components so server actions see latest auth cookies.
     router.refresh();
-  }, [router]);
+
+    await waitForProfileReady();
+  }, [router, waitForProfileReady]);
 
   const generateAndShowRecoveryCode = useCallback(async (): Promise<string | null> => {
     // We generate a recovery code immediately after identity creation.
@@ -139,6 +155,8 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
         const supabase = getBrowserSupabaseClient();
         const { data } = await supabase.auth.getSession();
         if (data.session) {
+          // Even with an existing session, the DB profile row may still be initializing.
+          await waitForProfileReady();
           await action();
           return;
         }
@@ -147,7 +165,7 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
         openGate(options);
       });
     },
-    [openGate, requirePrivacyConsent],
+    [openGate, requirePrivacyConsent, waitForProfileReady],
   );
 
   const value = useMemo<IdentityGateContextValue>(

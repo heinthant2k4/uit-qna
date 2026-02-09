@@ -134,7 +134,46 @@ async function ensureUserRow(adminClient: ReturnType<typeof createServiceRoleCli
     throw new Error(`PROFILE_INIT_FAILED:${existingError.message}`);
   }
   if (!existing) {
-    throw new Error('PROFILE_NOT_READY');
+    // Anonymous auth inserts into `auth.users` immediately, but the `public.users` row is created
+    // via a DB trigger and can lag (especially on fast clients). Using the service role here lets
+    // us deterministically "bootstrap" the row instead of asking the user to reload.
+    const anonHandle = `anon_${userId.replace(/-/g, '').slice(0, 20)}`;
+
+    const { data: seed, error: seedError } = await adminClient.rpc('seed_color_from_uuid', {
+      p_user_id: userId,
+    });
+    if (seedError) {
+      throw new Error(`PROFILE_INIT_FAILED:${seedError.message}`);
+    }
+
+    const colorSeed = typeof seed === 'number' ? seed : Number(seed ?? 180);
+    const { error: insertError } = await adminClient.from('users').insert({
+      id: userId,
+      anon_handle: anonHandle,
+      color_seed: colorSeed,
+    });
+
+    // `23505` unique violation => trigger already created row.
+    // `23503` FK violation => auth.users row not visible yet; treat as not ready.
+    if (insertError && insertError.code === '23503') {
+      throw new Error('PROFILE_NOT_READY');
+    }
+    if (insertError && insertError.code !== '23505') {
+      throw new Error(`PROFILE_INIT_FAILED:${insertError.message}`);
+    }
+
+    const { data: ensured, error: ensuredError } = await adminClient
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (ensuredError) {
+      throw new Error(`PROFILE_INIT_FAILED:${ensuredError.message}`);
+    }
+    if (!ensured) {
+      throw new Error('PROFILE_NOT_READY');
+    }
   }
 }
 
@@ -393,6 +432,23 @@ export async function recoverAccountWithCode(
     };
   } catch (error) {
     return toActionError(error, 'RECOVERY_CLAIM_FAILED');
+  }
+}
+
+// ─── Profile readiness ────────────────────────────────────────
+/**
+ * Anonymous auth creates an authenticated session immediately, but the platform also requires
+ * a matching `public.users` row (created by DB triggers). On fast clients, actions can run
+ * before that row exists. This helper lets the UI wait briefly without telling users to reload.
+ */
+export async function profileReady(): Promise<ActionResult<{ ready: true }>> {
+  try {
+    const adminClient = createServiceRoleClient();
+    const { userId } = await getAuthenticatedUserId();
+    await ensureUserRow(adminClient, userId);
+    return { ok: true, data: { ready: true } };
+  } catch (error) {
+    return toActionError(error, 'PROFILE_NOT_READY');
   }
 }
 

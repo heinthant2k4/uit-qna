@@ -16,10 +16,12 @@ export function useReplyMutation() {
 
   return useMutation({
     mutationFn: async (input: Input) => {
-      const result = await createReply(input);
-      if (result.ok === false) {
-        throw new Error(result.error);
+      let result = await createReply(input);
+      if (result.ok === false && result.code === 'PROFILE_NOT_READY') {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        result = await createReply(input);
       }
+      if (result.ok === false) throw new Error(result.error);
       return result.data;
     },
     onSuccess: (_result, input) => {
