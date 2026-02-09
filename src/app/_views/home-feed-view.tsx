@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/app-shell';
 import { EmptyState } from '../../components/empty-state';
@@ -16,6 +16,7 @@ import { Input } from '../../components/ui/input';
 import { useIdentityGate } from '../../components/providers/identity-gate-provider';
 import { useVoteMutation } from '../../hooks/mutations/use-vote-mutation';
 import { useFeedQuestions } from '../../hooks/queries/use-feed-questions';
+import { getBrowserSupabaseClient } from '../../lib/supabase/browser';
 import type { FeedSort } from '../../types/qna';
 
 type Props = {
@@ -52,8 +53,31 @@ export function HomeFeedView({ initialSort, initialPage, initialCategory }: Prop
   const router = useRouter();
   const [search, setSearch] = useState('');
   const voteMutation = useVoteMutation();
-  const { requireIdentity } = useIdentityGate();
+  const { requireIdentity, openGate } = useIdentityGate();
   const { data, isLoading, isError, error } = useFeedQuestions(initialSort, initialPage, initialCategory);
+
+  useEffect(() => {
+    // “Anonymous popup” on home feed:
+    // - Softly introduces the anonymous session concept in-context.
+    // - Does NOT create an identity; it only opens the explain modal.
+    // - Only once per browser (until storage is cleared).
+    const key = 'uit_identity_gate_seen_home_v1';
+    (async () => {
+      try {
+        if (localStorage.getItem(key) === '1') return;
+        const supabase = getBrowserSupabaseClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          localStorage.setItem(key, '1');
+          return;
+        }
+        localStorage.setItem(key, '1');
+        openGate({ reason: 'other' });
+      } catch {
+        // If storage is blocked, do nothing (browsing still works).
+      }
+    })();
+  }, [openGate]);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
   const pageNumbers = buildPageNumbers(initialPage, totalPages);

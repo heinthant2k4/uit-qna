@@ -180,7 +180,9 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
               'fixed left-1/2 top-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 -translate-y-1/2 outline-none',
             )}
           >
-            <Card className="border border-[rgb(var(--line))] bg-[rgb(var(--surface))] shadow-xl">
+            {/* Glassmorphic shell: reinforces “safe, anonymous space” without feeling like a login gate. */}
+            <div className="rounded-card bg-gradient-to-br from-white/30 to-white/5 p-[1px] shadow-[0_24px_80px_-24px_rgba(0,0,0,0.65)] dark:from-white/15 dark:to-white/0">
+              <Card className="border-white/20 bg-white/10 backdrop-blur-xl shadow-none dark:border-white/10 dark:bg-slate-950/40">
               <div className="flex items-start justify-between gap-4 border-b border-[rgb(var(--line))] p-4 md:p-5">
                 <div className="min-w-0">
                   <Dialog.Title className="text-title-sm text-[rgb(var(--fg))]">
@@ -455,7 +457,8 @@ export function IdentityGateProvider({ children }: { children: ReactNode }) {
                   </div>
                 ) : null}
               </div>
-            </Card>
+              </Card>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
